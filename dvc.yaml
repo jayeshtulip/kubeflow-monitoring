@@ -1,10 +1,5 @@
-# DVC Pipeline — Enterprise LLM Platform
-# Reproducible stages: preprocess -> embed -> index
-# Run: dvc repro
-# Params live in: mlops/dvc/params/rag_params.yaml
-
+# DVC Pipeline - Enterprise LLM Platform
 stages:
-
   preprocess:
     cmd: >
       python -m src.storage.qdrant.indexer
@@ -18,9 +13,6 @@ stages:
       - mlops/dvc/params/rag_params.yaml
     outs:
       - data/processed
-    metrics:
-      - data/processed/preprocess_metrics.json:
-          cache: false
     desc: "Chunk raw documents into fixed-size overlapping segments"
 
   embed:
@@ -36,9 +28,6 @@ stages:
       - mlops/dvc/params/rag_params.yaml
     outs:
       - data/embeddings
-    metrics:
-      - data/embeddings/embed_metrics.json:
-          cache: false
     desc: "Generate sentence-transformer embeddings for all chunks"
 
   index:
@@ -51,9 +40,6 @@ stages:
       - src/storage/qdrant/indexer.py
       - data/embeddings
       - mlops/dvc/params/rag_params.yaml
-    metrics:
-      - data/embeddings/index_metrics.json:
-          cache: false
     desc: "Upsert embeddings into Qdrant vector collections"
 
   validate_golden_qa:
@@ -61,12 +47,12 @@ stages:
       python -m src.ragas_eval.dataset_builder
         --mode validate
         --data-dir data/golden_qa
-        --output data/golden_qa/coverage_report.json
+        --output data/reports/coverage_report.json
     deps:
       - src/ragas_eval/dataset_builder.py
       - data/golden_qa
     outs:
-      - data/golden_qa/coverage_report.json:
+      - data/reports/coverage_report.json:
           cache: false
     desc: "Validate golden QA dataset coverage per domain"
 
@@ -83,9 +69,6 @@ stages:
       - data/embeddings
       - mlops/dvc/params/rag_params.yaml
     outs:
-      - data/ragas_results/baseline.json:
-          cache: false
-    metrics:
       - data/ragas_results/baseline.json:
           cache: false
     desc: "Run RAGAS baseline evaluation against golden QA dataset"
