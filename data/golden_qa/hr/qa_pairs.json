@@ -1,0 +1,142 @@
+[
+  {
+    "question": "How many sick days are employees entitled to per year?",
+    "ground_truth": "Employees are entitled to 12 sick days per year. Sick leave does not carry over to the next calendar year. A medical certificate is required for absences exceeding 3 consecutive days.",
+    "domain": "hr",
+    "category": "leave_policy",
+    "source_doc_id": "HR-1001"
+  },
+  {
+    "question": "What is the annual leave entitlement?",
+    "ground_truth": "Full-time employees receive 21 days of annual leave per year after completing 12 months of service. Leave can be carried over up to 10 days to the following year with manager approval.",
+    "domain": "hr",
+    "category": "leave_policy",
+    "source_doc_id": "HR-1002"
+  },
+  {
+    "question": "How do I apply for maternity or paternity leave?",
+    "ground_truth": "Submit a leave request through the HR portal at least 8 weeks before the expected start date. Maternity leave is 16 weeks at full pay. Paternity leave is 4 weeks at full pay.",
+    "domain": "hr",
+    "category": "leave_policy",
+    "source_doc_id": "HR-1003"
+  },
+  {
+    "question": "What is the notice period for resignation?",
+    "ground_truth": "The standard notice period is 30 days for individual contributors and 60 days for managers and above. Notice must be submitted in writing to the direct manager and HR.",
+    "domain": "hr",
+    "category": "offboarding",
+    "source_doc_id": "HR-1004"
+  },
+  {
+    "question": "What is the work from home policy?",
+    "ground_truth": "Employees may work from home up to 3 days per week with manager approval. Core office hours are 10am-4pm local time. Equipment and internet allowance of INR 2000/month is provided.",
+    "domain": "hr",
+    "category": "wfh_policy",
+    "source_doc_id": "HR-1005"
+  },
+  {
+    "question": "How do I claim reimbursement for training expenses?",
+    "ground_truth": "Submit training reimbursement claims via the expense portal within 30 days of completion. Annual limit is INR 50,000 per employee. Prior approval from manager required for amounts above INR 10,000.",
+    "domain": "hr",
+    "category": "benefits",
+    "source_doc_id": "HR-1006"
+  },
+  {
+    "question": "What is the process for requesting infrastructure access?",
+    "ground_truth": "Raise a Jira ticket in the INFRA project with access type, justification, and manager approval. Access is provisioned within 2 business days. All access follows least-privilege principle.",
+    "domain": "hr",
+    "category": "access_management",
+    "source_doc_id": "HR-1007"
+  },
+  {
+    "question": "Who is the HR point of contact for grievances?",
+    "ground_truth": "Raise grievances with your direct manager first. If unresolved within 5 business days, escalate to the HR Business Partner. Anonymous complaints can be submitted via the ethics hotline.",
+    "domain": "hr",
+    "category": "grievance",
+    "source_doc_id": "HR-1008"
+  },
+  {
+    "question": "What is the probation period for new employees?",
+    "ground_truth": "New employees have a 90-day probation period. Performance is reviewed at 30, 60, and 90 days. Confirmation of employment is subject to satisfactory performance during probation.",
+    "domain": "hr",
+    "category": "onboarding",
+    "source_doc_id": "HR-1009"
+  },
+  {
+    "question": "How is the annual performance bonus calculated?",
+    "ground_truth": "Annual bonus is based on individual performance rating (40%) and company financial performance (60%). Target bonus is 10-15% of annual salary depending on grade. Paid in Q1 of the following year.",
+    "domain": "hr",
+    "category": "compensation",
+    "source_doc_id": "HR-1010"
+  },
+  {
+    "question": "What health insurance benefits are provided?",
+    "ground_truth": "Comprehensive health insurance covers employee, spouse, and up to 2 children. Annual coverage limit is INR 5 lakhs per family. Includes dental and vision coverage. Cashless treatment at network hospitals.",
+    "domain": "hr",
+    "category": "benefits",
+    "source_doc_id": "HR-1011"
+  },
+  {
+    "question": "How do I report a workplace safety incident?",
+    "ground_truth": "Report workplace safety incidents to your manager immediately and submit a safety incident report via the HR portal within 24 hours. Serious injuries must also be reported to facility management.",
+    "domain": "hr",
+    "category": "safety",
+    "source_doc_id": "HR-1012"
+  },
+  {
+    "question": "What is the policy on using company equipment for personal use?",
+    "ground_truth": "Company equipment (laptops, phones) may be used for limited personal use that does not interfere with work duties. Prohibited: installing unlicensed software, storing personal media, cryptocurrency mining.",
+    "domain": "hr",
+    "category": "acceptable_use",
+    "source_doc_id": "HR-1013"
+  },
+  {
+    "question": "How many public holidays are granted per year?",
+    "ground_truth": "14 mandatory public holidays plus 2 optional restricted holidays per year. The holiday calendar is published annually in December. Optional holidays can be taken on any date with manager approval.",
+    "domain": "hr",
+    "category": "leave_policy",
+    "source_doc_id": "HR-1014"
+  },
+  {
+    "question": "What is the process for internal job transfers?",
+    "ground_truth": "Internal transfers require 12 months in current role and manager agreement. Apply through the internal jobs portal. Transfer package maintains current CTC. Cooling period of 6 months before next transfer.",
+    "domain": "hr",
+    "category": "career",
+    "source_doc_id": "HR-1015"
+  },
+  {
+    "question": "What is the company travel policy for business trips?",
+    "ground_truth": "Domestic travel: economy class for under 4 hours, business class allowed above 4 hours. International travel: business class for above 8 hours. Daily allowance: INR 2500 domestic, USD 75 international.",
+    "domain": "hr",
+    "category": "travel",
+    "source_doc_id": "HR-1016"
+  },
+  {
+    "question": "How do I enroll in the Employee Stock Option Plan?",
+    "ground_truth": "ESOP enrollment is automatic for employees at Grade 4 and above. Vesting schedule is 4 years with 1-year cliff. Option exercise price is set at the time of grant. Contact finance for ESOP statements.",
+    "domain": "hr",
+    "category": "compensation",
+    "source_doc_id": "HR-1017"
+  },
+  {
+    "question": "What is the code of conduct policy regarding conflicts of interest?",
+    "ground_truth": "Employees must disclose any personal financial interest in competitors, suppliers, or customers. Side businesses require prior written approval. Gifts above INR 1000 from vendors must be declared.",
+    "domain": "hr",
+    "category": "code_of_conduct",
+    "source_doc_id": "HR-1018"
+  },
+  {
+    "question": "How is overtime compensated?",
+    "ground_truth": "Overtime for non-exempt employees is compensated at 1.5x the regular hourly rate for hours exceeding 48 per week. Exempt employees are not entitled to overtime pay but may take compensatory time off.",
+    "domain": "hr",
+    "category": "compensation",
+    "source_doc_id": "HR-1019"
+  },
+  {
+    "question": "What support is available for mental health?",
+    "ground_truth": "Employee Assistance Program (EAP) provides 8 free confidential counselling sessions per year. Mental health days can be taken as sick leave without requiring a medical certificate. Wellness reimbursement of INR 5000/year.",
+    "domain": "hr",
+    "category": "benefits",
+    "source_doc_id": "HR-1020"
+  }
+]

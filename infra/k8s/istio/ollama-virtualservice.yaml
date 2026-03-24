@@ -1,0 +1,34 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: ollama-vs
+  namespace: llm-platform-prod
+spec:
+  hosts:
+    - ollama-service
+  http:
+    - route:
+        - destination:
+            host: ollama-service
+            port:
+              number: 11434
+          weight: 100
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: ollama-dr
+  namespace: llm-platform-prod
+spec:
+  host: ollama-service
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 10
+      http:
+        http1MaxPendingRequests: 10
+        http2MaxRequests: 100
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s

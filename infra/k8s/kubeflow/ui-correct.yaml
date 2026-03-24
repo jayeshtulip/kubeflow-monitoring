@@ -1,0 +1,15 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: ml-pipeline-ui
+          image: gcr.io/ml-pipeline/frontend:2.2.0
+          env:
+            - name: DEPLOYMENT
+              value: KFP
+            - name: ML_PIPELINE_SERVICE_HOST
+              value: ml-pipeline
+            - name: ML_PIPELINE_SERVICE_PORT
+              value: "8888"
+          ports:
+            - containerPort: 3000

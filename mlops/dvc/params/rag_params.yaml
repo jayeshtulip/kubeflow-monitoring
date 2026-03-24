@@ -1,0 +1,12 @@
+﻿# DVC parameter file - tracked by Git
+rag:
+  chunk_size: 150
+  overlap: 30
+  top_k: 5
+  embedding_model: all-MiniLM-L6-v2
+  embedding_dims: 384
+xgboost:
+  n_estimators: 300
+  max_depth: 6
+  learning_rate: 0.05
+  subsample: 0.8

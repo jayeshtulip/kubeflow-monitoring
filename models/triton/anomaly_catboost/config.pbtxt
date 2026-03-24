@@ -1,0 +1,7 @@
+﻿name: "anomaly_catboost"
+backend: "fil"
+max_batch_size: 8192
+input [{ name: "input__0" data_type: TYPE_FP32 dims: [300] }]
+output [{ name: "output__0" data_type: TYPE_FP32 dims: [1] }]
+instance_group [{ kind: KIND_GPU count: 1 }]
+parameters { key: "model_type" value { string_value: "catboost_classifier" } }

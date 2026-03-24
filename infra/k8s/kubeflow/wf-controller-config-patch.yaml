@@ -1,0 +1,16 @@
+data:
+  config: |
+    executor:
+      imagePullPolicy: IfNotPresent
+    podGCStrategy: OnWorkflowSuccess
+    artifactRepository:
+      s3:
+        endpoint: minio-service:9000
+        bucket: mlpipeline
+        insecure: true
+        accessKeySecret:
+          name: mlpipeline-minio-artifact
+          key: accesskey
+        secretKeySecret:
+          name: mlpipeline-minio-artifact
+          key: secretkey

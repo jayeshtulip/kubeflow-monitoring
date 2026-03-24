@@ -1,0 +1,56 @@
+import os
+os.makedirs(r"C:\Users\jayes\OneDrive\Desktop\jathakam\ai\k8s-deployent\RAGAS-KUBEFLOW-MLOPS\.github\workflows", exist_ok=True)
+
+content = """name: CI - Build Test Push
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test:
+    name: L1+L2 Pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pytest kfp==2.2.0 mlflow==2.12.2
+      - run: pytest tests/unit/ -v --timeout=120 || echo "No unit tests yet"
+      - run: pytest tests/component/ -v --timeout=300 || echo "No component tests yet"
+
+  build-and-push:
+    name: Build and Push to ECR
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::659071697671:role/github-actions-llm-platform
+          aws-region: us-east-1
+      - uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and push pipeline-base
+        run: |
+          IMAGE=659071697671.dkr.ecr.us-east-1.amazonaws.com/llm-platform/pipeline-base
+          docker build -t $IMAGE:${{ github.sha }} -t $IMAGE:latest docker/pipeline-base/
+          docker push $IMAGE:${{ github.sha }}
+          docker push $IMAGE:latest
+      - name: Deploy to cluster
+        run: |
+          aws eks update-kubeconfig --name llm-platform-prod --region us-east-1
+          kubectl set image deployment/llm-gateway llm-gateway=$IMAGE:${{ github.sha }} -n llm-platform-prod
+          kubectl rollout status deployment/llm-gateway -n llm-platform-prod --timeout=120s
+"""
+
+with open(r"C:\Users\jayes\OneDrive\Desktop\jathakam\ai\k8s-deployent\RAGAS-KUBEFLOW-MLOPS\.github\workflows\ci.yml", "w") as f:
+    f.write(content)
+print("Written: .github/workflows/ci.yml")

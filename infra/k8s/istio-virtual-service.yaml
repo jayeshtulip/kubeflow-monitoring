@@ -1,0 +1,72 @@
+# Istio VirtualService — A/B traffic split: Ollama 70% / vLLM 30%
+# Updated automatically by Argo Rollouts based on P06 A/B test winner
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: llm-platform-vs
+  namespace: llm-platform-prod
+spec:
+  hosts:
+    - llm-platform-api
+  http:
+    - match:
+        - headers:
+            x-model-backend:
+              exact: vllm
+      route:
+        - destination:
+            host: llm-platform-api
+            subset: vllm
+    - route:
+        - destination:
+            host: llm-platform-api
+            subset: ollama
+          weight: 70
+        - destination:
+            host: llm-platform-api
+            subset: vllm
+          weight: 30
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: llm-platform-dr
+  namespace: llm-platform-prod
+spec:
+  host: llm-platform-api
+  trafficPolicy:
+    connectionPool:
+      http:
+        http1MaxPendingRequests: 100
+        http2MaxRequests: 1000
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+  subsets:
+    - name: ollama
+      labels:
+        model-backend: ollama
+    - name: vllm
+      labels:
+        model-backend: vllm
+---
+# Blue/Green: production (blue=100%) vs canary (green=0% initially)
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: llm-platform-bluegreen
+  namespace: llm-platform-prod
+spec:
+  hosts:
+    - llm-platform-api-external
+  http:
+    - route:
+        - destination:
+            host: llm-platform-api
+            subset: blue
+          weight: 100
+        - destination:
+            host: llm-platform-api
+            subset: green
+          weight: 0

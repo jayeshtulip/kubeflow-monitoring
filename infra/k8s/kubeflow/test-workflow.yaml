@@ -1,0 +1,13 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: test-workflow
+  namespace: kubeflow
+spec:
+  entrypoint: say-hello
+  templates:
+    - name: say-hello
+      container:
+        image: alpine:3.18
+        command: [echo]
+        args: ["Hello from Argo on EKS!"]

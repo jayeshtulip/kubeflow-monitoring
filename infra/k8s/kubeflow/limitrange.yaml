@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: pipeline-storage-limit
+  namespace: kubeflow
+spec:
+  limits:
+    - type: Container
+      default:
+        ephemeral-storage: 15Gi
+      defaultRequest:
+        ephemeral-storage: 5Gi

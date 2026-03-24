@@ -1,0 +1,64 @@
+name: Merge Gate — L1/L2/L3 Tests
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  full-test-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install deps
+        run: pip install -r requirements.txt pytest pytest-asyncio pytest-timeout
+
+      - name: Configure AWS (for L1 tests)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-test
+          aws-region: us-east-1
+
+      - name: L1 Infrastructure tests
+        run: pytest tests/l1_infrastructure/ -m l1 -v --timeout=30
+        env:
+          EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+          AWS_REGION: us-east-1
+
+      - name: L2 Component tests
+        run: pytest tests/l2_component/ -m l2 -v --timeout=60
+        env:
+          QDRANT_HOST: ${{ secrets.STAGING_QDRANT_HOST }}
+          REDIS_HOST: ${{ secrets.STAGING_REDIS_HOST }}
+          POSTGRES_HOST: ${{ secrets.STAGING_POSTGRES_HOST }}
+
+      - name: L3 Integration tests
+        run: pytest tests/l3_integration/ -m l3 -v --timeout=120
+        env:
+          API_BASE_URL: ${{ secrets.STAGING_API_URL }}
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+
+  deploy-staging:
+    needs: full-test-suite
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update ArgoCD image tag
+        run: |
+          sed -i "s|tag:.*|tag: ${{ github.sha }}|g" \
+            gitops/apps/staging/llm-platform.yaml
+          git config user.email "ci@llm-platform.internal"
+          git config user.name "GitHub Actions"
+          git add gitops/apps/staging/llm-platform.yaml
+          git commit -m "ci: deploy ${{ github.sha }} to staging"
+          git push

@@ -1,0 +1,132 @@
+# LLM Platform — Prometheus Alerting Rules
+groups:
+  - name: llm_platform_sla
+    interval: 60s
+    rules:
+
+      - alert: HighP95Latency
+        expr: histogram_quantile(0.95, rate(llm_request_duration_ms_bucket[5m])) > 30000
+        for: 5m
+        labels:
+          severity: warning
+          team: sre
+        annotations:
+          summary: "P95 latency {{ $value | humanizeDuration }} exceeds 30s SLA"
+          runbook: "https://confluence.internal/runbooks/llm-high-latency"
+
+      - alert: CriticalP95Latency
+        expr: histogram_quantile(0.95, rate(llm_request_duration_ms_bucket[5m])) > 65000
+        for: 2m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "CRITICAL: P95 latency {{ $value | humanizeDuration }} exceeds 65s"
+          runbook: "https://confluence.internal/runbooks/llm-high-latency"
+
+      - alert: LowSuccessRate
+        expr: rate(llm_requests_total{status="success"}[5m]) / rate(llm_requests_total[5m]) < 0.95
+        for: 5m
+        labels:
+          severity: warning
+          team: sre
+        annotations:
+          summary: "Success rate {{ $value | humanizePercentage }} below 95% SLA"
+
+      - alert: CriticalSuccessRate
+        expr: rate(llm_requests_total{status="success"}[5m]) / rate(llm_requests_total[5m]) < 0.85
+        for: 2m
+        labels:
+          severity: critical
+          team: sre
+          page: "true"
+        annotations:
+          summary: "CRITICAL: Success rate {{ $value | humanizePercentage }} below 85%"
+
+  - name: llm_platform_quality
+    interval: 300s
+    rules:
+
+      - alert: HallucinationRateHigh
+        expr: llm_hallucination_rate > 0.02
+        for: 15m
+        labels:
+          severity: warning
+          team: ml
+        annotations:
+          summary: "Hallucination rate {{ $value | humanizePercentage }} exceeds 2% target"
+          action: "Trigger P09 RAGAS evaluation manually"
+
+      - alert: HallucinationRateCritical
+        expr: llm_hallucination_rate > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: ml
+        annotations:
+          summary: "CRITICAL: Hallucination rate {{ $value | humanizePercentage }} exceeds 5%"
+
+      - alert: RAGASFaithfulnessLow
+        expr: llm_ragas_faithfulness < 0.85
+        for: 30m
+        labels:
+          severity: warning
+          team: ml
+        annotations:
+          summary: "RAGAS faithfulness {{ $value }} below 0.85 threshold"
+          action: "Review P09 results and consider triggering P11 retraining"
+
+      - alert: DataDriftDetected
+        expr: embedding_drift_js_divergence > 0.15
+        for: 10m
+        labels:
+          severity: warning
+          team: ml
+        annotations:
+          summary: "Embedding drift JS-divergence {{ $value }} exceeds 0.15 threshold"
+          action: "P11 automated retraining should trigger automatically"
+
+  - name: llm_platform_infrastructure
+    interval: 60s
+    rules:
+
+      - alert: OllamaDown
+        expr: up{job="ollama"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: sre
+          page: "true"
+        annotations:
+          summary: "Ollama inference server is down"
+          runbook: "https://confluence.internal/runbooks/ollama-restart"
+
+      - alert: QdrantDown
+        expr: up{job="qdrant"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: sre
+          page: "true"
+        annotations:
+          summary: "Qdrant vector database is down"
+
+      - alert: HighGuardrailTriggerRate
+        expr: rate(guardrail_triggered_total[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "High guardrail trigger rate: {{ $value | humanize }}/s"
+          action: "Possible injection attack campaign underway"
+
+      - alert: PlatformHealthDegraded
+        expr: llm_platform_health_score < 0.6
+        for: 5m
+        labels:
+          severity: critical
+          team: sre
+          page: "true"
+        annotations:
+          summary: "Platform health score {{ $value }} below 0.6 (DEGRADED)"

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llm-platform-config
+data:
+  EMBEDDING_MODEL: {{ .Values.env.EMBEDDING_MODEL | quote }}
+  QDRANT_HOST: {{ .Values.env.QDRANT_HOST | quote }}
+  QDRANT_PORT: {{ .Values.env.QDRANT_PORT | quote }}
+  OLLAMA_BASE_URL: {{ .Values.env.OLLAMA_BASE_URL | quote }}
+  MLFLOW_TRACKING_URI: {{ .Values.env.MLFLOW_TRACKING_URI | quote }}
+  LANGCHAIN_TRACING_V2: {{ .Values.env.LANGCHAIN_TRACING_V2 | quote }}

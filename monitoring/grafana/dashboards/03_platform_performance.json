@@ -1,0 +1,185 @@
+{
+  "title": "Platform Performance \u2014 Throughput + vLLM + Redis",
+  "uid": "platform-perf-v1",
+  "tags": [
+    "llm-platform",
+    "performance",
+    "sre"
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Request Rate (req/min)",
+      "targets": [
+        {
+          "expr": "rate(llm_requests_total[1m]) * 60",
+          "legendFormat": "req/min"
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Success Rate",
+      "targets": [
+        {
+          "expr": "rate(llm_requests_total{status='success'}[5m]) / rate(llm_requests_total[5m])",
+          "legendFormat": "Success Rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "steps": [
+              {
+                "value": null,
+                "color": "red"
+              },
+              {
+                "value": 0.95,
+                "color": "yellow"
+              },
+              {
+                "value": 0.99,
+                "color": "green"
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Guardrail Triggers (rate/min)",
+      "targets": [
+        {
+          "expr": "rate(guardrail_triggered_total[1m]) * 60",
+          "legendFormat": "{{trigger_type}}"
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Data Drift Score",
+      "targets": [
+        {
+          "expr": "embedding_drift_js_divergence",
+          "legendFormat": "JS Divergence"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 0.1,
+                "color": "yellow"
+              },
+              {
+                "value": 0.15,
+                "color": "red"
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Workflow Routing Split",
+      "targets": [
+        {
+          "expr": "rate(llm_requests_total{workflow_type='simple'}[5m])",
+          "legendFormat": "Simple (70%)"
+        },
+        {
+          "expr": "rate(llm_requests_total{workflow_type='react'}[5m])",
+          "legendFormat": "ReAct (25%)"
+        },
+        {
+          "expr": "rate(llm_requests_total{workflow_type='planner_executor_critic'}[5m])",
+          "legendFormat": "PEC (5%)"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Tool Call Distribution",
+      "targets": [
+        {
+          "expr": "rate(llm_tool_calls_total[5m])",
+          "legendFormat": "{{tool_name}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Replan Rate (PEC)",
+      "targets": [
+        {
+          "expr": "rate(llm_replan_total[5m])",
+          "legendFormat": "Replans/s"
+        }
+      ],
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      }
+    }
+  ],
+  "schemaVersion": 38
+}

@@ -1,0 +1,12 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: workflow-controller
+          image: argoproj/workflow-controller:v3.3.10
+          args:
+            - --configmap
+            - workflow-controller-configmap
+            - --executor-image
+            - argoproj/argoexec:v3.3.10
+            - --namespaced

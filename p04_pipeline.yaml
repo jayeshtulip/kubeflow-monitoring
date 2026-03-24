@@ -1,0 +1,286 @@
+# PIPELINE DEFINITION
+# Name: p04-quality-monitoring
+# Description: Monitor platform health every 15 min. Alert on DEGRADED/CRITICAL.
+# Inputs:
+#    hallucination_threshold: float [Default: 0.02]
+#    lookback_minutes: int [Default: 15.0]
+#    mlflow_tracking_uri: str [Default: 'http://mlflow-service.mlflow.svc.cluster.local:5000']
+#    p95_latency_threshold_ms: float [Default: 30000.0]
+#    pagerduty_webhook_url: str [Default: '']
+#    prometheus_url: str [Default: 'http://prometheus-operated.monitoring.svc.cluster.local:9090']
+#    slack_webhook_url: str [Default: '']
+#    success_rate_threshold: float [Default: 0.95]
+# Outputs:
+#    evaluate-platform-health-component-health_metrics: system.Metrics
+components:
+  comp-collect-platform-metrics-component:
+    executorLabel: exec-collect-platform-metrics-component
+    inputDefinitions:
+      parameters:
+        lookback_minutes:
+          parameterType: NUMBER_INTEGER
+        mlflow_tracking_uri:
+          parameterType: STRING
+        prometheus_url:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        platform_metrics:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-evaluate-platform-health-component:
+    executorLabel: exec-evaluate-platform-health-component
+    inputDefinitions:
+      artifacts:
+        platform_metrics:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        hallucination_threshold:
+          parameterType: NUMBER_DOUBLE
+        mlflow_tracking_uri:
+          parameterType: STRING
+        p95_latency_threshold_ms:
+          parameterType: NUMBER_DOUBLE
+        pagerduty_webhook_url:
+          parameterType: STRING
+        slack_webhook_url:
+          parameterType: STRING
+        success_rate_threshold:
+          parameterType: NUMBER_DOUBLE
+    outputDefinitions:
+      artifacts:
+        health_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        health_report:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-collect-platform-metrics-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - collect_platform_metrics_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.2.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'mlflow==2.12.2'\
+          \ 'boto3==1.34.69' 'requests==2.32.0' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef collect_platform_metrics_component(\n    prometheus_url: str,\n\
+          \    mlflow_tracking_uri: str,\n    lookback_minutes: int,\n    platform_metrics:\
+          \ Output[Artifact],\n) -> str:\n    \"\"\"Collect P95 latency, success rate,\
+          \ hallucination rate from Prometheus + MLflow.\"\"\"\n    import json, requests,\
+          \ mlflow\n    metrics = {}\n    prom_queries = {\n        \"p95_latency_ms\"\
+          :  \"histogram_quantile(0.95, rate(llm_request_duration_ms_bucket[5m]))\"\
+          ,\n        \"success_rate\":    \"rate(llm_requests_total{status=\\\"success\\\
+          \"}[5m]) / rate(llm_requests_total[5m])\",\n        \"request_rate\":  \
+          \  \"rate(llm_requests_total[5m])\",\n        \"guardrail_rate\":  \"rate(guardrail_triggered_total[5m])\"\
+          ,\n    }\n    for name, query in prom_queries.items():\n        try:\n \
+          \           r = requests.get(f\"{prometheus_url}/api/v1/query\",\n     \
+          \                        params={\"query\": query}, timeout=10)\n      \
+          \      result = r.json().get(\"data\", {}).get(\"result\", [])\n       \
+          \     metrics[name] = float(result[0][\"value\"][1]) if result else 0.0\n\
+          \        except Exception as e:\n            metrics[name] = 0.0\n     \
+          \       print(f\"Prometheus query failed for {name}: {e}\")\n    mlflow.set_tracking_uri(mlflow_tracking_uri)\n\
+          \    client = mlflow.tracking.MlflowClient()\n    runs = client.search_runs(\n\
+          \        experiment_names=[\"ragas-evaluation\"],\n        filter_string=\"\
+          tags.pipeline = 'P09-RAGAS'\",\n        max_results=1, order_by=[\"start_time\
+          \ DESC\"])\n    metrics[\"hallucination_rate\"] = (\n        runs[0].data.metrics.get(\"\
+          hallucination_rate\", 0.0) if runs else 0.0)\n    metrics[\"ragas_faithfulness\"\
+          ] = (\n        runs[0].data.metrics.get(\"faithfulness\", 0.0) if runs else\
+          \ 0.0)\n    with open(platform_metrics.path, \"w\") as f:\n        json.dump(metrics,\
+          \ f, indent=2)\n    print(\"Collected metrics:\", metrics)\n    return json.dumps(metrics)\n\
+          \n"
+        image: python:3.11-slim
+    exec-evaluate-platform-health-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - evaluate_platform_health_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.2.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'mlflow==2.12.2'\
+          \ 'boto3==1.34.69' 'requests==2.32.0' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef evaluate_platform_health_component(\n    platform_metrics: Input[Artifact],\n\
+          \    p95_latency_threshold_ms: float,\n    success_rate_threshold: float,\n\
+          \    hallucination_threshold: float,\n    mlflow_tracking_uri: str,\n  \
+          \  pagerduty_webhook_url: str,\n    slack_webhook_url: str,\n    health_report:\
+          \ Output[Artifact],\n    health_metrics: Output[Metrics],\n) -> str:\n \
+          \   \"\"\"Evaluate health status. Alert if DEGRADED or CRITICAL.\"\"\"\n\
+          \    import json, mlflow, requests\n    with open(platform_metrics.path)\
+          \ as f:\n        m = json.load(f)\n    violations = []\n    if m.get(\"\
+          p95_latency_ms\", 0) > p95_latency_threshold_ms:\n        violations.append(\n\
+          \            f\"P95 latency {m['p95_latency_ms']:.0f}ms > {p95_latency_threshold_ms}ms\"\
+          )\n    if m.get(\"success_rate\", 1.0) < success_rate_threshold:\n     \
+          \   violations.append(\n            f\"Success rate {m['success_rate']:.2%}\
+          \ < {success_rate_threshold:.2%}\")\n    if m.get(\"hallucination_rate\"\
+          , 0) > hallucination_threshold:\n        violations.append(\n          \
+          \  f\"Hallucination {m['hallucination_rate']:.3f} > {hallucination_threshold}\"\
+          )\n    n = len(violations)\n    status = (\"HEALTHY\"  if n == 0 else\n\
+          \              \"WARNING\"  if n == 1 else\n              \"DEGRADED\" if\
+          \ n == 2 else\n              \"CRITICAL\")\n    health_score = max(0.0,\
+          \ 1.0 - n * 0.33)\n    report = {\"status\": status, \"health_score\": health_score,\n\
+          \              \"violations\": violations, \"metrics\": m}\n    mlflow.set_tracking_uri(mlflow_tracking_uri)\n\
+          \    mlflow.set_experiment(\"quality-monitoring\")\n    with mlflow.start_run(run_name=f\"\
+          health-{status}\") as run:\n        mlflow.log_metrics({**m, \"health_score\"\
+          : health_score})\n        mlflow.set_tags({\"status\": status, \"pipeline\"\
+          : \"P04-QualityMonitor\"})\n    report[\"mlflow_run_id\"] = run.info.run_id\n\
+          \    with open(health_report.path, \"w\") as f:\n        json.dump(report,\
+          \ f, indent=2)\n    health_metrics.log_metric(\"health_score\", health_score)\n\
+          \    health_metrics.log_metric(\"violation_count\", float(n))\n    if status\
+          \ in (\"DEGRADED\", \"CRITICAL\"):\n        msg = f\":fire: *Platform {status}*\\\
+          n\" + \"\\n\".join(violations)\n        if slack_webhook_url and slack_webhook_url.startswith(\"\
+          https://\"):\n            try: requests.post(slack_webhook_url, json={\"\
+          text\": msg}, timeout=10)\n            except Exception: pass\n        if\
+          \ status == \"CRITICAL\" and pagerduty_webhook_url.startswith(\"https://\"\
+          ):\n            pd = {\"routing_key\": \"\", \"event_action\": \"trigger\"\
+          ,\n                  \"payload\": {\"summary\": msg, \"severity\": \"critical\"\
+          ,\n                              \"source\": \"llm-platform\"}}\n      \
+          \      try: requests.post(pagerduty_webhook_url, json=pd, timeout=10)\n\
+          \            except Exception: pass\n    print(f\"Platform health: {status}\
+          \ score={health_score:.2f}\")\n    return status\n\n"
+        image: python:3.11-slim
+pipelineInfo:
+  description: Monitor platform health every 15 min. Alert on DEGRADED/CRITICAL.
+  name: p04-quality-monitoring
+root:
+  dag:
+    outputs:
+      artifacts:
+        evaluate-platform-health-component-health_metrics:
+          artifactSelectors:
+          - outputArtifactKey: health_metrics
+            producerSubtask: evaluate-platform-health-component
+    tasks:
+      collect-platform-metrics-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-collect-platform-metrics-component
+        inputs:
+          parameters:
+            lookback_minutes:
+              componentInputParameter: lookback_minutes
+            mlflow_tracking_uri:
+              componentInputParameter: mlflow_tracking_uri
+            prometheus_url:
+              componentInputParameter: prometheus_url
+        taskInfo:
+          name: 1 Collect platform metrics (Prometheus + MLflow)
+      evaluate-platform-health-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-evaluate-platform-health-component
+        dependentTasks:
+        - collect-platform-metrics-component
+        inputs:
+          artifacts:
+            platform_metrics:
+              taskOutputArtifact:
+                outputArtifactKey: platform_metrics
+                producerTask: collect-platform-metrics-component
+          parameters:
+            hallucination_threshold:
+              componentInputParameter: hallucination_threshold
+            mlflow_tracking_uri:
+              componentInputParameter: mlflow_tracking_uri
+            p95_latency_threshold_ms:
+              componentInputParameter: p95_latency_threshold_ms
+            pagerduty_webhook_url:
+              componentInputParameter: pagerduty_webhook_url
+            slack_webhook_url:
+              componentInputParameter: slack_webhook_url
+            success_rate_threshold:
+              componentInputParameter: success_rate_threshold
+        taskInfo:
+          name: 2 Evaluate health + alert PagerDuty/Slack
+  inputDefinitions:
+    parameters:
+      hallucination_threshold:
+        defaultValue: 0.02
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      lookback_minutes:
+        defaultValue: 15.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      mlflow_tracking_uri:
+        defaultValue: http://mlflow-service.mlflow.svc.cluster.local:5000
+        isOptional: true
+        parameterType: STRING
+      p95_latency_threshold_ms:
+        defaultValue: 30000.0
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      pagerduty_webhook_url:
+        defaultValue: ''
+        isOptional: true
+        parameterType: STRING
+      prometheus_url:
+        defaultValue: http://prometheus-operated.monitoring.svc.cluster.local:9090
+        isOptional: true
+        parameterType: STRING
+      slack_webhook_url:
+        defaultValue: ''
+        isOptional: true
+        parameterType: STRING
+      success_rate_threshold:
+        defaultValue: 0.95
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+  outputDefinitions:
+    artifacts:
+      evaluate-platform-health-component-health_metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.2.0

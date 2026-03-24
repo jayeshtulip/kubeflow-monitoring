@@ -1,0 +1,142 @@
+[
+  {
+    "question": "Who is the CTO of the organization?",
+    "ground_truth": "The CTO leads the Engineering and Product divisions. For current leadership information, check the internal org chart on the intranet or contact HR.",
+    "domain": "org",
+    "category": "leadership",
+    "source_doc_id": "ORG-1001"
+  },
+  {
+    "question": "What is the on-call rotation for the SRE team?",
+    "ground_truth": "SRE on-call rotates weekly every Monday at 09:00 IST. The current on-call engineer and escalation path are listed in PagerDuty. Primary on-call handles P1/P2 incidents within 15 minutes.",
+    "domain": "org",
+    "category": "oncall",
+    "source_doc_id": "ORG-1002"
+  },
+  {
+    "question": "How do I escalate a P1 production incident?",
+    "ground_truth": "P1 incidents: page the on-call SRE via PagerDuty immediately. Create a war room Slack channel #inc-YYYYMMDD. Notify engineering manager and VP Engineering within 15 minutes. Post updates every 30 minutes.",
+    "domain": "org",
+    "category": "incident_management",
+    "source_doc_id": "ORG-1003"
+  },
+  {
+    "question": "What are the severity levels for incidents?",
+    "ground_truth": "P1: Complete outage, data loss risk \u2014 SLA 15 min response. P2: Major degradation \u2014 30 min. P3: Minor issue, workaround available \u2014 2 hours. P4: Cosmetic, no user impact \u2014 next business day.",
+    "domain": "org",
+    "category": "incident_management",
+    "source_doc_id": "ORG-1004"
+  },
+  {
+    "question": "What is the deployment freeze period?",
+    "ground_truth": "Production deployments are frozen from December 20 to January 3 (year-end freeze). Additional freeze periods are announced 2 weeks in advance via the engineering all-hands and Slack #deployments channel.",
+    "domain": "org",
+    "category": "deployment_policy",
+    "source_doc_id": "ORG-1005"
+  },
+  {
+    "question": "How is the sprint planning cycle structured?",
+    "ground_truth": "Two-week sprints starting Monday. Sprint planning Monday morning, daily standups at 10:30 IST, sprint review and retrospective on the last Friday. Velocity tracked in Jira per team.",
+    "domain": "org",
+    "category": "engineering_process",
+    "source_doc_id": "ORG-1006"
+  },
+  {
+    "question": "Who approves production deployments?",
+    "ground_truth": "Production deployments require approval from the engineering team lead and passing all CI/CD gates (L1-L3 tests, RAGAS gate, security scan). Major releases additionally require VP Engineering sign-off.",
+    "domain": "org",
+    "category": "deployment_policy",
+    "source_doc_id": "ORG-1007"
+  },
+  {
+    "question": "What is the post-mortem process after a P1 incident?",
+    "ground_truth": "Post-mortem must be completed within 48 hours of P1 resolution. Template in Confluence: timeline, root cause, contributing factors, action items with owners and due dates. Blameless culture enforced.",
+    "domain": "org",
+    "category": "incident_management",
+    "source_doc_id": "ORG-1008"
+  },
+  {
+    "question": "How do I request a new AWS resource or service?",
+    "ground_truth": "Submit an infrastructure request Jira ticket with business justification and estimated cost. Approval required from engineering manager for monthly cost above USD 500. Provisioning via Terraform only, no manual console changes.",
+    "domain": "org",
+    "category": "infrastructure_governance",
+    "source_doc_id": "ORG-1009"
+  },
+  {
+    "question": "What is the code review policy?",
+    "ground_truth": "All code changes require at least 2 approvals from team members. Security-sensitive changes require 1 approval from the security team. Reviews must be completed within 24 business hours. No self-merging allowed.",
+    "domain": "org",
+    "category": "engineering_process",
+    "source_doc_id": "ORG-1010"
+  },
+  {
+    "question": "What tools are used for team communication?",
+    "ground_truth": "Slack for async communication and incident channels. Confluence for documentation. Jira for project management and ticketing. Zoom for video meetings. PagerDuty for incident alerting and on-call management.",
+    "domain": "org",
+    "category": "tools",
+    "source_doc_id": "ORG-1011"
+  },
+  {
+    "question": "What is the data retention policy for logs?",
+    "ground_truth": "Application logs in CloudWatch: 90-day retention. Security and audit logs: 1 year. Database backups: 35-day automated retention. Long-term archival to S3 Glacier for compliance data after 1 year.",
+    "domain": "org",
+    "category": "data_governance",
+    "source_doc_id": "ORG-1012"
+  },
+  {
+    "question": "How are new engineers onboarded to the platform?",
+    "ground_truth": "30-60-90 day onboarding plan. Week 1: environment setup, Confluence reading. Week 2: shadow on-call, pair programming. Month 2: first independent ticket. Month 3: first on-call rotation.",
+    "domain": "org",
+    "category": "onboarding",
+    "source_doc_id": "ORG-1013"
+  },
+  {
+    "question": "What is the change management process?",
+    "ground_truth": "All infrastructure changes require a change request in Jira with: description, impact analysis, rollback plan, and testing evidence. Standard changes need 48-hour lead time. Emergency changes need manager approval.",
+    "domain": "org",
+    "category": "change_management",
+    "source_doc_id": "ORG-1014"
+  },
+  {
+    "question": "How are production secrets managed?",
+    "ground_truth": "All secrets stored in AWS Secrets Manager. No secrets in Git, environment variables, or Kubernetes Secrets as plaintext. Rotation every 30 days via Lambda. Access via External Secrets Operator and IRSA.",
+    "domain": "org",
+    "category": "security",
+    "source_doc_id": "ORG-1015"
+  },
+  {
+    "question": "What is the SLA for the LLM platform API?",
+    "ground_truth": "P95 response latency: Simple workflow < 30s, ReAct < 45s, PEC < 65s. Availability SLA: 99.5% monthly. Maintenance windows: Sundays 02:00-04:00 UTC with 48-hour advance notice.",
+    "domain": "org",
+    "category": "sla",
+    "source_doc_id": "ORG-1016"
+  },
+  {
+    "question": "How do I get added to the PagerDuty on-call schedule?",
+    "ground_truth": "Request on-call access from your engineering manager. Complete the incident response training (2-hour async course in Confluence). Shadow an existing on-call engineer for one week before going solo.",
+    "domain": "org",
+    "category": "oncall",
+    "source_doc_id": "ORG-1017"
+  },
+  {
+    "question": "What is the engineering all-hands meeting schedule?",
+    "ground_truth": "Engineering all-hands meets bi-weekly on alternate Fridays at 15:00 IST. Agenda: company updates, technical deep-dives, Q&A. Recorded and posted to Confluence within 24 hours.",
+    "domain": "org",
+    "category": "meetings",
+    "source_doc_id": "ORG-1018"
+  },
+  {
+    "question": "What is the process for open source contributions?",
+    "ground_truth": "Internal-use only projects: no approval needed. Contributions to external open-source: requires legal review and manager approval. No proprietary code, algorithms, or customer data may be shared externally.",
+    "domain": "org",
+    "category": "intellectual_property",
+    "source_doc_id": "ORG-1019"
+  },
+  {
+    "question": "How is infrastructure cost optimised?",
+    "ground_truth": "Monthly FinOps review identifies unused resources. Auto-scaling configured for all EKS workloads. Non-prod environments shut down outside business hours via scheduled Lambda. Savings Plans cover baseline EC2 usage.",
+    "domain": "org",
+    "category": "finops",
+    "source_doc_id": "ORG-1020"
+  }
+]

@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+  labels:
+    grafana_datasource: "1"
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+        access: proxy
+        isDefault: true
+        jsonData:
+          timeInterval: "15s"
+
+      - name: PostgreSQL
+        type: postgres
+        url: FILL_RDS_ENDPOINT:5432
+        database: llm_platform
+        user: llm_admin
+        secureJsonData:
+          password: FILL_DB_PASSWORD
+        jsonData:
+          sslmode: require
+          maxOpenConns: 5
+          maxIdleConns: 2
+          connMaxLifetime: 14400
+          postgresVersion: 1500
+          timescaledb: false

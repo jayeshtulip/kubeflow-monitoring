@@ -1,0 +1,529 @@
+# Kubeflow Pipelines 2.x Standalone Installation
+# Source: kubeflow/pipelines platform-agnostic-pns
+# Namespace: kubeflow (already exists from Katib install)
+
+---
+# MinIO for artifact storage (lightweight S3-compatible)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-pvc
+  namespace: kubeflow
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  namespace: kubeflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: minio}
+  template:
+    metadata:
+      labels: {app: minio}
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:RELEASE.2023-04-20T17-56-55Z
+          args: [server, /data]
+          env:
+            - {name: MINIO_ACCESS_KEY, value: minio}
+            - {name: MINIO_SECRET_KEY, value: minio123}
+          ports:
+            - containerPort: 9000
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: minio-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-service
+  namespace: kubeflow
+spec:
+  selector: {app: minio}
+  ports:
+    - port: 9000
+      targetPort: 9000
+---
+# MySQL for KFP metadata
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: kubeflow
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: kubeflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: mysql}
+  template:
+    metadata:
+      labels: {app: mysql}
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0.26
+          env:
+            - {name: MYSQL_ALLOW_EMPTY_PASSWORD, value: "true"}
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: mysql-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: kubeflow
+spec:
+  selector: {app: mysql}
+  ports:
+    - port: 3306
+      targetPort: 3306
+---
+# KFP ML-Metadata gRPC server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metadata-grpc-deployment
+  namespace: kubeflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: metadata-grpc-server}
+  template:
+    metadata:
+      labels: {app: metadata-grpc-server}
+    spec:
+      containers:
+        - name: container
+          image: gcr.io/tfx-oss-public/ml_metadata_store_server:1.14.0
+          env:
+            - {name: DBCONFIG_USER, value: root}
+            - {name: DBCONFIG_PASSWORD, value: ""}
+            - {name: MYSQL_DATABASE, value: metadb}
+            - {name: MYSQL_HOST, value: mysql}
+            - {name: MYSQL_PORT, value: "3306"}
+          command: [/bin/metadata_store_server]
+          args:
+            - --grpc_port=8080
+            - --mysql_config_host=mysql
+            - --mysql_config_database=metadb
+            - --mysql_config_port=3306
+            - --mysql_config_user=root
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metadata-grpc-service
+  namespace: kubeflow
+spec:
+  selector: {app: metadata-grpc-server}
+  ports:
+    - name: grpc-backend
+      port: 8080
+      targetPort: 8080
+---
+# KFP API Server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-pipeline
+  namespace: kubeflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: ml-pipeline}
+  template:
+    metadata:
+      labels: {app: ml-pipeline}
+    spec:
+      serviceAccountName: ml-pipeline
+      containers:
+        - name: ml-pipeline-api-server
+          image: gcr.io/ml-pipeline/api-server:2.2.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: AUTO_UPDATE_PIPELINE_DEFAULT_VERSION, value: "true"}
+            - {name: DBCONFIG_USER, value: root}
+            - {name: DBCONFIG_PASSWORD, value: ""}
+            - {name: DBCONFIG_DBNAME, value: mlpipeline}
+            - {name: DBCONFIG_HOST, value: mysql}
+            - {name: DBCONFIG_PORT, value: "3306"}
+            - {name: DBCONFIG_MYSQLCONFIG_USER, value: root}
+            - {name: DBCONFIG_MYSQLCONFIG_PASSWORD, value: ""}
+            - {name: DBCONFIG_MYSQLCONFIG_DBNAME, value: mlpipeline}
+            - {name: DBCONFIG_MYSQLCONFIG_HOST, value: mysql}
+            - {name: DBCONFIG_MYSQLCONFIG_PORT, value: "3306"}
+            - {name: MINIO_SERVICE_SERVICE_HOST, value: minio-service}
+            - {name: MINIO_SERVICE_SERVICE_PORT, value: "9000"}
+            - {name: OBJECTSTORECONFIG_ACCESSKEY, value: minio}
+            - {name: OBJECTSTORECONFIG_SECRETACCESSKEY, value: minio123}
+            - {name: OBJECTSTORECONFIG_BUCKETNAME, value: mlpipeline}
+            - {name: OBJECTSTORECONFIG_HOST, value: minio-service}
+            - {name: OBJECTSTORECONFIG_PORT, value: "9000"}
+            - {name: OBJECTSTORECONFIG_SECURE, value: "false"}
+            - {name: METADATA_GRPC_SERVICE_SERVICE_HOST, value: metadata-grpc-service}
+            - {name: METADATA_GRPC_SERVICE_SERVICE_PORT, value: "8080"}
+          ports:
+            - containerPort: 8888
+            - containerPort: 8887
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-pipeline
+  namespace: kubeflow
+spec:
+  selector: {app: ml-pipeline}
+  ports:
+    - name: http
+      port: 8888
+      targetPort: 8888
+    - name: grpc
+      port: 8887
+      targetPort: 8887
+---
+# KFP UI
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-pipeline-ui
+  namespace: kubeflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: ml-pipeline-ui}
+  template:
+    metadata:
+      labels: {app: ml-pipeline-ui}
+    spec:
+      containers:
+        - name: ml-pipeline-ui
+          image: gcr.io/ml-pipeline/frontend:2.2.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: DEPLOYMENT, value: KFP}
+            - {name: HIDE_SIDENAV, value: "false"}
+            - {name: ML_PIPELINE_SERVICE_HOST, value: ml-pipeline}
+            - {name: ML_PIPELINE_SERVICE_PORT, value: "8888"}
+            - {name: MINIO_NAMESPACE, value: kubeflow}
+          ports:
+            - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-pipeline-ui
+  namespace: kubeflow
+spec:
+  selector: {app: ml-pipeline-ui}
+  ports:
+    - port: 80
+      targetPort: 3000
+---
+# KFP Persistence Agent
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-pipeline-persistenceagent
+  namespace: kubeflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: ml-pipeline-persistenceagent}
+  template:
+    metadata:
+      labels: {app: ml-pipeline-persistenceagent}
+    spec:
+      serviceAccountName: ml-pipeline-persistenceagent
+      containers:
+        - name: agent
+          image: gcr.io/ml-pipeline/persistenceagent:2.2.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: NAMESPACE, value: kubeflow}
+            - {name: DBCONFIG_USER, value: root}
+            - {name: DBCONFIG_PASSWORD, value: ""}
+            - {name: DBCONFIG_DBNAME, value: mlpipeline}
+            - {name: DBCONFIG_HOST, value: mysql}
+            - {name: DBCONFIG_PORT, value: "3306"}
+            - {name: DBCONFIG_MYSQLCONFIG_USER, value: root}
+            - {name: DBCONFIG_MYSQLCONFIG_PASSWORD, value: ""}
+            - {name: DBCONFIG_MYSQLCONFIG_DBNAME, value: mlpipeline}
+            - {name: DBCONFIG_MYSQLCONFIG_HOST, value: mysql}
+            - {name: DBCONFIG_MYSQLCONFIG_PORT, value: "3306"}
+---
+# KFP Scheduled Workflow
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-pipeline-scheduledworkflow
+  namespace: kubeflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: ml-pipeline-scheduledworkflow}
+  template:
+    metadata:
+      labels: {app: ml-pipeline-scheduledworkflow}
+    spec:
+      serviceAccountName: ml-pipeline-scheduledworkflow
+      containers:
+        - name: scheduledworkflow
+          image: gcr.io/ml-pipeline/scheduledworkflow:2.2.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: NAMESPACE, value: kubeflow}
+            - {name: CRON_SCHEDULE_TIMEZONE, value: UTC}
+---
+# KFP Metadata Writer
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metadata-writer
+  namespace: kubeflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: metadata-writer}
+  template:
+    metadata:
+      labels: {app: metadata-writer}
+    spec:
+      containers:
+        - name: main
+          image: gcr.io/ml-pipeline/metadata-writer:2.2.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: NAMESPACE_TO_WATCH, value: ""}
+            - {name: METADATA_GRPC_SERVICE_SERVICE_HOST, value: metadata-grpc-service}
+            - {name: METADATA_GRPC_SERVICE_SERVICE_PORT, value: "8080"}
+---
+# ServiceAccounts
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ml-pipeline
+  namespace: kubeflow
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ml-pipeline-persistenceagent
+  namespace: kubeflow
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ml-pipeline-scheduledworkflow
+  namespace: kubeflow
+---
+# RBAC for ml-pipeline
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ml-pipeline
+rules:
+  - apiGroups: [""]
+    resources: [pods, pods/log, events, namespaces, nodes, secrets, configmaps,
+                persistentvolumes, persistentvolumeclaims, serviceaccounts]
+    verbs: [get, list, watch, create, delete, patch, update]
+  - apiGroups: [argoproj.io]
+    resources: [workflows, workflows/finalizers, workflowtemplates,
+                workflowtemplates/finalizers, cronworkflows, cronworkflows/finalizers,
+                clusterworkflowtemplates]
+    verbs: [get, list, watch, create, delete, update, patch]
+  - apiGroups: [kubeflow.org]
+    resources: [scheduledworkflows, scheduledworkflows/finalizers]
+    verbs: [get, list, watch, create, delete, update, patch]
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: [get, list, watch, create, delete, update, patch]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, list, watch, create, delete, update, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ml-pipeline
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ml-pipeline
+subjects:
+  - kind: ServiceAccount
+    name: ml-pipeline
+    namespace: kubeflow
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ml-pipeline-persistenceagent
+rules:
+  - apiGroups: [argoproj.io]
+    resources: [workflows]
+    verbs: [get, list, watch]
+  - apiGroups: [kubeflow.org]
+    resources: [scheduledworkflows]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ml-pipeline-persistenceagent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ml-pipeline-persistenceagent
+subjects:
+  - kind: ServiceAccount
+    name: ml-pipeline-persistenceagent
+    namespace: kubeflow
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ml-pipeline-scheduledworkflow
+rules:
+  - apiGroups: [argoproj.io]
+    resources: [cronworkflows, workflows]
+    verbs: [get, list, watch, create, delete, update, patch]
+  - apiGroups: [kubeflow.org]
+    resources: [scheduledworkflows]
+    verbs: [get, list, watch, create, delete, update, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ml-pipeline-scheduledworkflow
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ml-pipeline-scheduledworkflow
+subjects:
+  - kind: ServiceAccount
+    name: ml-pipeline-scheduledworkflow
+    namespace: kubeflow
+---
+# Argo Workflows (KFP execution backend)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo
+  namespace: kubeflow
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argo-role
+rules:
+  - apiGroups: [""]
+    resources: [pods, pods/exec, pods/log, services, endpoints,
+                persistentvolumeclaims, resourcequotas, secrets, configmaps, events]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [argoproj.io]
+    resources: [workflows, workflows/finalizers, workflowtemplates,
+                clusterworkflowtemplates, cronworkflows]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argo-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argo-role
+subjects:
+  - kind: ServiceAccount
+    name: argo
+    namespace: kubeflow
+---
+# Argo Workflow Controller
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workflow-controller
+  namespace: kubeflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: workflow-controller}
+  template:
+    metadata:
+      labels: {app: workflow-controller}
+    spec:
+      serviceAccountName: argo
+      containers:
+        - name: workflow-controller
+          image: argoproj/workflow-controller:v3.4.11
+          env:
+            - {name: LEADER_ELECTION_IDENTITY, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
+          args:
+            - --configmap
+            - workflow-controller-configmap
+            - --executor-image
+            - argoproj/argoexec:v3.4.11
+            - --namespaced
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workflow-controller-configmap
+  namespace: kubeflow
+data:
+  config: |
+    executor:
+      imagePullPolicy: IfNotPresent
+    artifactRepository:
+      s3:
+        endpoint: minio-service:9000
+        bucket: mlpipeline
+        insecure: true
+        accessKeySecret:
+          name: mlpipeline-minio-artifact
+          key: accesskey
+        secretKeySecret:
+          name: mlpipeline-minio-artifact
+          key: secretkey
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mlpipeline-minio-artifact
+  namespace: kubeflow
+stringData:
+  accesskey: minio
+  secretkey: minio123

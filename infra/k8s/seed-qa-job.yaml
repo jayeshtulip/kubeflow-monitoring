@@ -1,0 +1,134 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: seed-qa-data
+  namespace: llm-platform-prod
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: seeder
+          image: python:3.11-slim
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              pip install psycopg2-binary -q &&
+              python -c "
+              import psycopg2, json, os
+
+              conn = psycopg2.connect(
+                host=os.environ['POSTGRES_HOST'],
+                dbname='llm_platform',
+                user='llm_admin',
+                password=os.environ['POSTGRES_PASSWORD'],
+                port=5432,
+                sslmode='require'
+              )
+              cur = conn.cursor()
+
+              # Check existing count
+              cur.execute('SELECT COUNT(*) FROM golden_qa')
+              existing = cur.fetchone()[0]
+              print('Existing rows:', existing)
+
+              if existing >= 60:
+                print('Already seeded, skipping')
+                conn.close()
+                exit()
+
+              # 20 tech QA pairs
+              tech_qa = [
+                ('What causes pod evictions in EKS?', 'Pod evictions occur when node memory pressure exceeds eviction thresholds set by kubelet, typically when available memory drops below 100Mi.', 'tech'),
+                ('How do you fix RDS connection pool exhaustion?', 'Implement PgBouncer connection pooler, set pool_size=20 per pod, and increase RDS max_connections parameter.', 'tech'),
+                ('What is the XGBoost scale_pos_weight parameter?', 'scale_pos_weight balances positive and negative class weights during training, set to 19 for 5% anomaly rate (95/5 ratio).', 'tech'),
+                ('How does Triton FIL backend work?', 'FIL (Forest Inference Library) backend loads XGBoost .ubj and CatBoost .cbm files and runs GPU-accelerated batch inference.', 'tech'),
+                ('What is PagedAttention in vLLM?', 'PagedAttention manages KV cache using non-contiguous memory pages like OS virtual memory, eliminating waste from fixed-length allocations.', 'tech'),
+                ('How does LangGraph PEC workflow work?', 'Planner generates investigation steps, Executor runs tool calls, Critic evaluates completeness and provides replan feedback if incomplete.', 'tech'),
+                ('What is RAGAS faithfulness metric?', 'Faithfulness measures the fraction of claims in the response that are grounded in the retrieved context using NLI-based scoring.', 'tech'),
+                ('How does DVC track data versions?', 'DVC creates .dvc pointer files in Git containing SHA hashes of data artifacts stored in S3 remote, enabling reproducible pipelines.', 'tech'),
+                ('What causes Jensen-Shannon divergence alerts?', 'JS-divergence above 0.15 between live query embeddings and training baseline indicates data drift requiring retraining.', 'tech'),
+                ('How does Katib Bayesian optimization work?', 'Katib models the objective function using Gaussian process and selects next trial to maximize expected improvement over current best.', 'tech'),
+                ('What is the Qdrant cosine similarity threshold?', 'Qdrant returns vectors with cosine similarity above 0.6 for L2 tests and 0.7 for production relevance filtering.', 'tech'),
+                ('How does ArgoCD app-of-apps pattern work?', 'A root ArgoCD Application manages child Applications for each service and environment, enabling GitOps for the entire platform.', 'tech'),
+                ('What triggers Kubeflow P11 retraining?', 'P11 is triggered by Evidently drift alerts via webhook or manually on-demand when RAGAS faithfulness drops below 0.85.', 'tech'),
+                ('How does Istio blue-green deployment work?', 'Istio VirtualService shifts traffic weights 10 to 50 to 100 percent to the green deployment over 10 minutes with auto-rollback on errors.', 'tech'),
+                ('What is the hallucination rate hard block threshold?', 'P09 RAGAS evaluation blocks deployment if hallucination rate exceeds 0.05, triggering automated retraining via P11.', 'tech'),
+                ('How does External Secrets Operator work?', 'ESO syncs Kubernetes Secret objects from AWS Secrets Manager every hour using IRSA for least-privilege IAM access.', 'tech'),
+                ('What is the LangGraph workflow routing logic?', 'Complexity score 1-10 routes to Simple under 3, Smart Tools 4-5, ReAct 6-7, and PEC 8-10 based on query analysis.', 'tech'),
+                ('How does Evidently concept drift detection work?', 'Evidently monitors RAGAS faithfulness over rolling 7-day window and triggers alert when degradation exceeds 10 percent.', 'tech'),
+                ('What is MLflow Model Registry champion stage?', 'Champion stage requires P95 latency under 65s and success rate above 98 percent with senior engineer manual approval.', 'tech'),
+                ('How does Redis session store work in LangGraph?', 'Redis stores LangGraph conversation state with 1-hour TTL, enables multi-turn context and query deduplication with 5-minute TTL.', 'tech'),
+              ]
+
+              # 20 HR QA pairs
+              hr_qa = [
+                ('What is the leave policy for new employees?', 'New employees are entitled to 12 days of annual leave in the first year, prorated based on joining date.', 'hr'),
+                ('How do I submit an expense reimbursement?', 'Submit expense reports through the HR portal within 30 days of incurring the expense with receipts attached.', 'hr'),
+                ('What is the performance review cycle?', 'Performance reviews are conducted annually in December with mid-year check-ins in June for goal alignment.', 'hr'),
+                ('What health insurance plans are available?', 'Employees can choose from three health plans: Basic, Standard, and Premium with enrollment during the annual open period.', 'hr'),
+                ('How do I request a work from home arrangement?', 'Submit a WFH request to your manager 48 hours in advance through the HR portal with the expected duration.', 'hr'),
+                ('What is the maternity leave entitlement?', 'Maternity leave is 26 weeks paid leave as per the Maternity Benefit Act with an option for 12 additional weeks unpaid.', 'hr'),
+                ('How are annual bonuses calculated?', 'Annual bonuses are calculated based on company performance at 40 percent and individual performance rating at 60 percent.', 'hr'),
+                ('What is the notice period for resignation?', 'The standard notice period is 60 days for senior engineers and 30 days for other roles as per employment contract.', 'hr'),
+                ('How do I enroll in the provident fund?', 'PF enrollment is automatic for employees earning below the threshold. Submit Form 11 to HR within 30 days of joining.', 'hr'),
+                ('What training budget is available per employee?', 'Each employee has an annual learning budget of INR 50,000 for courses, certifications, and conferences.', 'hr'),
+                ('How do I report a workplace grievance?', 'Report grievances through the HR portal or directly to the HR Business Partner. All reports are confidential.', 'hr'),
+                ('What are the core working hours?', 'Core working hours are 10 AM to 4 PM IST. Employees have flexibility for the remaining hours within an 8-hour workday.', 'hr'),
+                ('How is overtime compensated?', 'Overtime beyond 9 hours is compensated at 1.5x hourly rate or given as compensatory time off at the managers discretion.', 'hr'),
+                ('What is the referral bonus policy?', 'Employee referrals that result in hiring earn a bonus of INR 25,000 paid after the referred employee completes 6 months.', 'hr'),
+                ('How do I apply for a salary advance?', 'Salary advances up to one month salary can be requested through HR portal once per financial year for medical emergencies.', 'hr'),
+                ('What equipment is provided to new joiners?', 'New joiners receive a laptop, monitor, keyboard, and mouse. Choose between MacBook Pro and Dell XPS during onboarding.', 'hr'),
+                ('How do I update my bank account for salary?', 'Submit bank account change requests to HR at least 10 working days before the salary processing date with a cancelled cheque.', 'hr'),
+                ('What is the travel policy for client visits?', 'Client visits use economy class for under 4 hours and business class for over 4 hours with per diem allowances.', 'hr'),
+                ('How does the stock options ESOP work?', 'ESOP grants vest over 4 years with a 1-year cliff. Exercise window is 90 days after leaving the company.', 'hr'),
+                ('What is the sabbatical leave policy?', 'Employees with over 5 years of service can apply for unpaid sabbatical of 3 to 12 months for education or personal projects.', 'hr'),
+              ]
+
+              # 20 org QA pairs
+              org_qa = [
+                ('What does Zadara Cloud Technologies do?', 'Zadara provides enterprise cloud infrastructure services including storage, compute, and networking as a service globally.', 'org'),
+                ('What is the company mission?', 'Zadara mission is to deliver enterprise-grade cloud infrastructure that gives customers complete control over their data and workloads.', 'org'),
+                ('Where are Zadara offices located?', 'Zadara has offices in Israel headquarters, United States, India, and data centers across North America, Europe, and Asia Pacific.', 'org'),
+                ('What is the India team responsible for?', 'The India team focuses on quality engineering, AI/ML validation, MLOps, cloud infrastructure testing, and platform reliability.', 'org'),
+                ('How many employees does Zadara have?', 'Zadara employs approximately 300 to 400 professionals globally across engineering, operations, sales, and support functions.', 'org'),
+                ('What cloud platforms does Zadara support?', 'Zadara supports AWS, Azure, Google Cloud, and on-premises deployments through its ZIOS operating system and management layer.', 'org'),
+                ('What is the engineering culture at Zadara?', 'Zadara engineering culture emphasizes reliability, automation, continuous improvement, and ownership of end-to-end systems.', 'org'),
+                ('How does Zadara handle customer data security?', 'Zadara uses encryption at rest and in transit, SOC 2 compliance, dedicated tenancy, and customer-controlled encryption keys.', 'org'),
+                ('What is the on-call rotation policy?', 'On-call rotations are weekly with a primary and secondary engineer. P1 incidents require response within 15 minutes.', 'org'),
+                ('What are the core engineering values?', 'Core values are reliability first, automate everything, measure what matters, own your failures, and help your teammates.', 'org'),
+                ('How does the incident response process work?', 'P1 incidents trigger PagerDuty alerts, war room in Slack, 15-minute response SLA, RCA within 24 hours, and postmortem within 1 week.', 'org'),
+                ('What monitoring tools does the platform team use?', 'Platform team uses Prometheus, Grafana, LangSmith, CloudWatch, PagerDuty, and custom MLflow dashboards for observability.', 'org'),
+                ('What is the deployment frequency target?', 'Target is daily deployments to staging and weekly to production with automated rollback for any health check failures.', 'org'),
+                ('How are architecture decisions made?', 'Architecture decisions use RFC process with a written proposal, 1-week review period, and sign-off from tech lead and architects.', 'org'),
+                ('What is the code review policy?', 'All code requires at least two approvals from engineers who are not the author before merging to main branch.', 'org'),
+                ('How does the AI team collaborate with platform?', 'AI team embeds with platform engineers for sprint planning, shares MLflow experiments in weekly reviews, and co-owns production models.', 'org'),
+                ('What certifications does Zadara hold?', 'Zadara holds ISO 27001, SOC 2 Type II, and PCI DSS certifications with annual third-party security audits.', 'org'),
+                ('What is the escalation path for production issues?', 'Production issues escalate from on-call engineer to team lead to engineering manager to VP of Engineering based on severity.', 'org'),
+                ('How does cross-team knowledge sharing work?', 'Weekly tech talks, monthly architecture reviews, shared Confluence documentation, and pair programming sessions across teams.', 'org'),
+                ('What is the intern and new grad program?', 'Zadara runs a 6-month intern program and new grad bootcamp covering cloud infrastructure, automation, and ML systems fundamentals.', 'org'),
+              ]
+
+              # Insert all QA pairs
+              inserted = 0
+              for qa_list in [tech_qa, hr_qa, org_qa]:
+                for question, answer, domain in qa_list:
+                  cur.execute(
+                    'INSERT INTO golden_qa (question, ground_truth, domain, active) VALUES (%s, %s, %s, TRUE)',
+                    (question, answer, domain)
+                  )
+                  inserted += 1
+
+              conn.commit()
+              cur.execute('SELECT domain, COUNT(*) FROM golden_qa GROUP BY domain ORDER BY domain')
+              rows = cur.fetchall()
+              print('Seeded', inserted, 'QA pairs')
+              for domain, count in rows:
+                print(' ', domain, ':', count, 'pairs')
+              conn.close()
+              "
+          env:
+            - name: POSTGRES_HOST
+              value: "llm-platform-prod-postgres.c2xig0uywkrb.us-east-1.rds.amazonaws.com"
+            - name: POSTGRES_PASSWORD
+              value: "Llmplatform2026"

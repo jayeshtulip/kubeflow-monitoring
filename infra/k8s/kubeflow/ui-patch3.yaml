@@ -1,0 +1,39 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: ml-pipeline-ui
+          image: gcr.io/ml-pipeline/api-server:2.2.0
+          env:
+            - name: ML_PIPELINE_SERVICE_HOST
+              value: ml-pipeline
+            - name: ML_PIPELINE_SERVICE_PORT
+              value: "8888"
+            - name: ML_PIPELINE_VISUALIZATIONSERVER_SERVICE_HOST
+              value: ml-pipeline-visualizationserver
+            - name: ML_PIPELINE_VISUALIZATIONSERVER_SERVICE_PORT
+              value: "8888"
+            - name: MINIO_NAMESPACE
+              value: kubeflow
+            - name: ALLOW_CUSTOM_VISUALIZATIONS
+              value: "true"
+            - name: DBCONFIG_MYSQLCONFIG_HOST
+              value: mysql
+            - name: DBCONFIG_MYSQLCONFIG_USER
+              value: root
+            - name: DBCONFIG_MYSQLCONFIG_PASSWORD
+              value: ""
+            - name: DBCONFIG_MYSQLCONFIG_DBNAME
+              value: mlpipeline
+            - name: OBJECTSTORECONFIG_HOST
+              value: minio-service
+            - name: OBJECTSTORECONFIG_PORT
+              value: "9000"
+            - name: OBJECTSTORECONFIG_ACCESSKEY
+              value: minio
+            - name: OBJECTSTORECONFIG_SECRETACCESSKEY
+              value: minio123
+            - name: OBJECTSTORECONFIG_BUCKETNAME
+              value: mlpipeline
+            - name: OBJECTSTORECONFIG_SECURE
+              value: "false"

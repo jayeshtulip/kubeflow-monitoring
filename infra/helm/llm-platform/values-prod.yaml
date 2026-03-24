@@ -1,0 +1,46 @@
+# Production overrides
+
+replicaCount:
+  api:    4
+  agents: 3
+
+image:
+  registry: "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com"
+  api:
+    tag: latest          # updated by ArgoCD Image Updater
+  agents:
+    tag: latest
+
+resources:
+  api:
+    requests:
+      cpu: "1"
+      memory: "2Gi"
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+  agents:
+    requests:
+      cpu: "2"
+      memory: "4Gi"
+    limits:
+      cpu: "8"
+      memory: "16Gi"
+
+autoscaling:
+  enabled: true
+  api:
+    minReplicas: 4
+    maxReplicas: 12
+    targetCPUUtilizationPercentage: 65
+
+ingress:
+  host: api.llm-platform.internal
+  annotations:
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:ACCOUNT_ID:certificate/CERT_ID"
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+
+env:
+  REDIS_HOST: "llm-platform-redis.xxxxx.cache.amazonaws.com"
+  POSTGRES_HOST: "llm-platform.xxxxxxxx.us-east-1.rds.amazonaws.com"
+  LANGSMITH_PROJECT: "llm-platform-prod"

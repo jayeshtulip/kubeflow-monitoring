@@ -1,0 +1,36 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: llm-platform-gateway
+  namespace: llm-platform-prod
+spec:
+  selector:
+    istio: ingress
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: llm-platform-vs
+  namespace: llm-platform-prod
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - llm-platform-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /api/
+      route:
+        - destination:
+            host: llm-gateway
+            port:
+              number: 8000
+

@@ -1,0 +1,57 @@
+# LLM Platform — API + agents deployment
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: llm-platform-api
+  namespace: argocd
+  annotations:
+    argocd-image-updater.argoproj.io/image-list: api=ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/llm-platform/api
+    argocd-image-updater.argoproj.io/api.update-strategy: digest
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/your-org/llm-platform.git
+    targetRevision: HEAD
+    path: infra/helm/llm-platform
+    helm:
+      valueFiles:
+        - values-prod.yaml
+      parameters:
+        - name: image.tag
+          value: latest
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: llm-platform-prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 30s
+        maxDuration: 5m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: llm-platform-monitoring
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/your-org/llm-platform.git
+    targetRevision: HEAD
+    path: infra/helm/prometheus-stack
+    helm:
+      valueFiles:
+        - values-prod.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true

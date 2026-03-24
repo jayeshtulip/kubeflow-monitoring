@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant
+  namespace: kubeflow
+spec:
+  type: ExternalName
+  externalName: qdrant.llm-platform-prod.svc.cluster.local
+  ports:
+    - port: 6333
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-service
+  namespace: kubeflow
+spec:
+  type: ExternalName
+  externalName: ollama-service.llm-platform-prod.svc.cluster.local
+  ports:
+    - port: 11434
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: kubeflow
+spec:
+  type: ExternalName
+  externalName: llm-platform-prod-redis.dho8vz.0001.use1.cache.amazonaws.com
+  ports:
+    - port: 6379

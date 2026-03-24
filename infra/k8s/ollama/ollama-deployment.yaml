@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: llm-platform-prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+        - name: ollama
+          image: ollama/ollama:latest
+          ports:
+            - containerPort: 11434
+              name: http
+          env:
+            - name: OLLAMA_MODELS
+              value: /models
+          volumeMounts:
+            - name: models
+              mountPath: /models
+          resources:
+            requests:
+              cpu: "4"
+              memory: "16Gi"
+            limits:
+              cpu: "8"
+              memory: "32Gi"
+          livenessProbe:
+            httpGet:
+              path: /api/version
+              port: 11434
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/version
+              port: 11434
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - "sleep 10 && ollama pull mistral:7b"
+      volumes:
+        - name: models
+          emptyDir:
+            medium: Memory
+            sizeLimit: 20Gi
+      nodeSelector:
+        node.kubernetes.io/instance-type: c5.4xlarge

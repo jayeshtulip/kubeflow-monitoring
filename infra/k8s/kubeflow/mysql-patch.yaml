@@ -1,0 +1,7 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: mysql
+          args:
+            - --default-authentication-plugin=mysql_native_password

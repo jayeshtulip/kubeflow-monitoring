@@ -1,0 +1,1036 @@
+# PIPELINE DEFINITION
+# Name: p09-ragas-evaluation
+# Description: RAGAS evaluation: retrieve -> generate -> score -> gate -> promote/block
+# Inputs:
+#    collection_names: str [Default: '["tech_docs","hr_policies","org_info"]']
+#    domain_filter: str [Default: '']
+#    embedding_model: str [Default: 'all-MiniLM-L6-v2']
+#    faithfulness_hard_block: float [Default: 0.85]
+#    hallucination_hard_block: float [Default: 0.15]
+#    kubeflow_p11_webhook_url: str [Default: '']
+#    max_tokens: int [Default: 512.0]
+#    min_pairs_per_domain: int [Default: 20.0]
+#    mlflow_experiment: str [Default: 'ragas-evaluation']
+#    mlflow_tracking_uri: str [Default: 'http://172.20.232.117:80']
+#    model_name: str [Default: 'llm-platform-rag-config']
+#    model_version: str [Default: 'latest']
+#    ollama_base_url: str [Default: 'http://ollama-service.llm-platform-prod.svc.cluster.local:11434']
+#    ollama_model: str [Default: 'mistral:7b']
+#    postgres_db: str [Default: 'llm_platform']
+#    postgres_host: str [Default: 'llm-platform-prod-postgres.c2xig0uywkrb.us-east-1.rds.amazonaws.com']
+#    postgres_password: str [Default: 'Llmplatform2026']
+#    postgres_user: str [Default: 'llm_admin']
+#    qa_limit: int [Default: 200.0]
+#    qdrant_host: str [Default: 'qdrant-service.llm-platform-prod.svc.cluster.local']
+#    qdrant_port: int [Default: 6333.0]
+#    run_name: str [Default: 'ragas-weekly']
+#    slack_webhook_url: str [Default: '']
+#    top_k: int [Default: 5.0]
+# Outputs:
+#    ragas-score-component-ragas_metrics_output: system.Metrics
+components:
+  comp-block-deployment-component:
+    executorLabel: exec-block-deployment-component
+    inputDefinitions:
+      artifacts:
+        ragas_report:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        kubeflow_webhook_url:
+          parameterType: STRING
+        model_name:
+          parameterType: STRING
+        version:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        block_artifact:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+  comp-condition-1:
+    dag:
+      tasks:
+        notify-slack-component:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-notify-slack-component
+          dependentTasks:
+          - promote-to-staging-component
+          inputs:
+            artifacts:
+              promotion_result:
+                taskOutputArtifact:
+                  outputArtifactKey: promotion_result
+                  producerTask: promote-to-staging-component
+              ragas_report:
+                componentInputArtifact: pipelinechannel--ragas-score-component-ragas_report
+            parameters:
+              model_name:
+                componentInputParameter: pipelinechannel--model_name
+              slack_webhook_url:
+                componentInputParameter: pipelinechannel--slack_webhook_url
+              version:
+                componentInputParameter: pipelinechannel--model_version
+          taskInfo:
+            name: notify-slack-component
+        promote-to-staging-component:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-promote-to-staging-component
+          inputs:
+            artifacts:
+              ragas_report:
+                componentInputArtifact: pipelinechannel--ragas-score-component-ragas_report
+            parameters:
+              mlflow_tracking_uri:
+                componentInputParameter: pipelinechannel--mlflow_tracking_uri
+              model_name:
+                componentInputParameter: pipelinechannel--model_name
+              ragas_gate_passed:
+                runtimeValue:
+                  constant: true
+              version:
+                componentInputParameter: pipelinechannel--model_version
+          taskInfo:
+            name: promote-to-staging-component
+    inputDefinitions:
+      artifacts:
+        pipelinechannel--ragas-score-component-ragas_report:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        pipelinechannel--mlflow_tracking_uri:
+          parameterType: STRING
+        pipelinechannel--model_name:
+          parameterType: STRING
+        pipelinechannel--model_version:
+          parameterType: STRING
+        pipelinechannel--ragas-score-component-Output:
+          parameterType: BOOLEAN
+        pipelinechannel--slack_webhook_url:
+          parameterType: STRING
+  comp-condition-2:
+    dag:
+      tasks:
+        block-deployment-component:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-block-deployment-component
+          inputs:
+            artifacts:
+              ragas_report:
+                componentInputArtifact: pipelinechannel--ragas-score-component-ragas_report
+            parameters:
+              kubeflow_webhook_url:
+                componentInputParameter: pipelinechannel--kubeflow_p11_webhook_url
+              model_name:
+                componentInputParameter: pipelinechannel--model_name
+              version:
+                componentInputParameter: pipelinechannel--model_version
+          taskInfo:
+            name: block-deployment-component
+        notify-slack-component-2:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-notify-slack-component-2
+          dependentTasks:
+          - block-deployment-component
+          inputs:
+            artifacts:
+              promotion_result:
+                taskOutputArtifact:
+                  outputArtifactKey: block_artifact
+                  producerTask: block-deployment-component
+              ragas_report:
+                componentInputArtifact: pipelinechannel--ragas-score-component-ragas_report
+            parameters:
+              model_name:
+                componentInputParameter: pipelinechannel--model_name
+              slack_webhook_url:
+                componentInputParameter: pipelinechannel--slack_webhook_url
+              version:
+                componentInputParameter: pipelinechannel--model_version
+          taskInfo:
+            name: notify-slack-component-2
+    inputDefinitions:
+      artifacts:
+        pipelinechannel--ragas-score-component-ragas_report:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        pipelinechannel--kubeflow_p11_webhook_url:
+          parameterType: STRING
+        pipelinechannel--model_name:
+          parameterType: STRING
+        pipelinechannel--model_version:
+          parameterType: STRING
+        pipelinechannel--ragas-score-component-Output:
+          parameterType: BOOLEAN
+        pipelinechannel--slack_webhook_url:
+          parameterType: STRING
+  comp-generate-answers-component:
+    executorLabel: exec-generate-answers-component
+    inputDefinitions:
+      artifacts:
+        retrieval_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        max_tokens:
+          parameterType: NUMBER_INTEGER
+        model_name:
+          parameterType: STRING
+        ollama_base_url:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        answered_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: NUMBER_INTEGER
+  comp-notify-slack-component:
+    executorLabel: exec-notify-slack-component
+    inputDefinitions:
+      artifacts:
+        promotion_result:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        ragas_report:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        model_name:
+          parameterType: STRING
+        slack_webhook_url:
+          parameterType: STRING
+        version:
+          parameterType: STRING
+  comp-notify-slack-component-2:
+    executorLabel: exec-notify-slack-component-2
+    inputDefinitions:
+      artifacts:
+        promotion_result:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        ragas_report:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        model_name:
+          parameterType: STRING
+        slack_webhook_url:
+          parameterType: STRING
+        version:
+          parameterType: STRING
+  comp-promote-to-staging-component:
+    executorLabel: exec-promote-to-staging-component
+    inputDefinitions:
+      artifacts:
+        ragas_report:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        mlflow_tracking_uri:
+          parameterType: STRING
+        model_name:
+          parameterType: STRING
+        ragas_gate_passed:
+          parameterType: BOOLEAN
+        version:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        promotion_result:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: BOOLEAN
+  comp-ragas-score-component:
+    executorLabel: exec-ragas-score-component
+    inputDefinitions:
+      artifacts:
+        answered_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        faithfulness_hard_block:
+          parameterType: NUMBER_DOUBLE
+        hallucination_hard_block:
+          parameterType: NUMBER_DOUBLE
+        mlflow_experiment:
+          parameterType: STRING
+        mlflow_tracking_uri:
+          parameterType: STRING
+        ollama_base_url:
+          defaultValue: http://ollama-service.llm-platform-prod.svc.cluster.local:11434
+          isOptional: true
+          parameterType: STRING
+        ollama_model:
+          defaultValue: mistral:7b
+          isOptional: true
+          parameterType: STRING
+        run_name:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        ragas_metrics_output:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        ragas_report:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: BOOLEAN
+  comp-retrieve-contexts-component:
+    executorLabel: exec-retrieve-contexts-component
+    inputDefinitions:
+      parameters:
+        collection_names:
+          parameterType: STRING
+        domain_filter:
+          parameterType: STRING
+        embedding_model:
+          parameterType: STRING
+        postgres_db:
+          parameterType: STRING
+        postgres_host:
+          parameterType: STRING
+        postgres_password:
+          parameterType: STRING
+        postgres_user:
+          parameterType: STRING
+        qa_limit:
+          parameterType: NUMBER_INTEGER
+        qdrant_host:
+          parameterType: STRING
+        qdrant_port:
+          parameterType: NUMBER_INTEGER
+        top_k:
+          parameterType: NUMBER_INTEGER
+    outputDefinitions:
+      artifacts:
+        retrieval_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: NUMBER_INTEGER
+deploymentSpec:
+  executors:
+    exec-block-deployment-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - block_deployment_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.2.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'requests==2.32.0'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef block_deployment_component(\n    model_name: str,\n    version:\
+          \ str,\n    ragas_report: Input[Artifact],\n    kubeflow_webhook_url: str,\n\
+          \    block_artifact: Output[Artifact],\n) -> None:\n    import json, requests\n\
+          \    with open(ragas_report.path) as f:\n        ragas_data = json.load(f)\n\
+          \    record = {\"blocked\": True, \"model_name\": model_name, \"version\"\
+          : version,\n              \"gate_failures\": ragas_data.get(\"gate_failures\"\
+          , [])}\n    with open(block_artifact.path, \"w\") as f:\n        json.dump(record,\
+          \ f, indent=2)\n    print(\"BLOCKED:\", model_name, version)\n    if kubeflow_webhook_url\
+          \ and kubeflow_webhook_url.startswith(\"http\"):\n        try:\n       \
+          \     requests.post(kubeflow_webhook_url, json=record, timeout=15)\n   \
+          \     except Exception as e:\n            print(\"Webhook error:\", e)\n\
+          \n"
+        image: 659071697671.dkr.ecr.us-east-1.amazonaws.com/llm-platform/pipeline-base:latest
+    exec-generate-answers-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - generate_answers_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.2.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'requests==2.32.0'\
+          \ 'httpx==0.27.0' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef generate_answers_component(\n    retrieval_dataset: Input[Dataset],\n\
+          \    ollama_base_url: str,\n    model_name: str,\n    max_tokens: int,\n\
+          \    # Outputs\n    answered_dataset: Output[Dataset],\n) -> int:\n    \"\
+          \"\"\n    For each row in retrieval_dataset, call Ollama to generate an\
+          \ answer\n    using the retrieved contexts as the RAG context window.\n\n\
+          \    Returns the number of answers generated.\n    \"\"\"\n    import json\n\
+          \    import httpx\n\n    SYSTEM_PROMPT = (\n        \"You are an expert\
+          \ infrastructure engineer. \"\n        \"Answer the question based ONLY\
+          \ on the provided context. \"\n        \"If the context does not contain\
+          \ enough information, say so explicitly. \"\n        \"Be concise and factual.\"\
+          \n    )\n\n    def generate(question: str, contexts: list[str]) -> str:\n\
+          \        context_str = \"\\n\\n\".join(f\"[Context {i+1}]\\n{c}\" for i,\
+          \ c in enumerate(contexts))\n        prompt = f\"{context_str}\\n\\nQuestion:\
+          \ {question}\\nAnswer:\"\n\n        payload = {\n            \"model\":\
+          \  model_name,\n            \"prompt\": prompt,\n            \"system\"\
+          : SYSTEM_PROMPT,\n            \"stream\": False,\n            \"options\"\
+          : {\"num_predict\": max_tokens, \"temperature\": 0.0},\n        }\n    \
+          \    try:\n            resp = httpx.post(\n                f\"{ollama_base_url}/api/generate\"\
+          ,\n                json=payload,\n                timeout=60.0,\n      \
+          \      )\n            resp.raise_for_status()\n            return resp.json().get(\"\
+          response\", \"\").strip()\n        except Exception as e:\n            return\
+          \ f\"[generation_error: {e}]\"\n\n    rows = []\n    with open(retrieval_dataset.path)\
+          \ as f:\n        for line in f:\n            row = json.loads(line)\n  \
+          \          row[\"answer\"] = generate(row[\"question\"], row[\"contexts\"\
+          ])\n            rows.append(row)\n\n    with open(answered_dataset.path,\
+          \ \"w\") as f:\n        for row in rows:\n            f.write(json.dumps(row)\
+          \ + \"\\n\")\n\n    return len(rows)\n\n"
+        image: 659071697671.dkr.ecr.us-east-1.amazonaws.com/llm-platform/pipeline-base:latest
+    exec-notify-slack-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - notify_slack_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.2.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'mlflow==2.12.0'\
+          \ 'boto3==1.34.0' 'requests==2.32.0' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef notify_slack_component(\n    slack_webhook_url: str,\n    model_name:\
+          \ str,\n    version: str,\n    promotion_result: Input[Artifact],\n    ragas_report:\
+          \ Input[Artifact],\n) -> None:\n    \"\"\"\n    Post a Slack message summarising\
+          \ the RAGAS result and promotion decision.\n    Used at the end of P09 regardless\
+          \ of pass/fail.\n    \"\"\"\n    import json\n    import requests\n\n  \
+          \  with open(promotion_result.path) as f:\n        promo = json.load(f)\n\
+          \    with open(ragas_report.path) as f:\n        ragas = json.load(f)\n\n\
+          \    promoted = promo.get(\"promoted\", False)\n    icon = \":white_check_mark:\"\
+          \ if promoted else \":x:\"\n    status = \"Promoted to *Staging*\" if promoted\
+          \ else f\"*Blocked* \u2014 {promo.get('reason', 'unknown')}\"\n\n    text\
+          \ = (\n        f\"{icon} *P09 RAGAS Evaluation* \u2014 {model_name} v{version}\\\
+          n\"\n        f\"Status: {status}\\n\"\n        f\"Faithfulness: `{ragas.get('faithfulness',\
+          \ 'n/a'):.3f}` (target \u2265 0.90)\\n\"\n        f\"Hallucination: `{ragas.get('hallucination_rate',\
+          \ 'n/a'):.3f}` (target \u2264 0.10)\\n\"\n        f\"Answer Relevancy: `{ragas.get('answer_relevancy',\
+          \ 'n/a'):.3f}`\\n\"\n        f\"Samples: {ragas.get('sample_count', 'n/a')}\
+          \ | \"\n        f\"Eval time: {ragas.get('eval_seconds', 'n/a')}s\\n\"\n\
+          \        f\"MLflow run: `{ragas.get('mlflow_run_id', 'n/a')}`\"\n    )\n\
+          \n    if slack_webhook_url and slack_webhook_url.startswith(\"https://\"\
+          ):\n        try:\n            requests.post(slack_webhook_url, json={\"\
+          text\": text}, timeout=10)\n        except Exception as e:\n           \
+          \ print(f\"Slack notification failed: {e}\")\n\n    print(text)\n\n"
+        image: python:3.11-slim
+    exec-notify-slack-component-2:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - notify_slack_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.2.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'mlflow==2.12.0'\
+          \ 'boto3==1.34.0' 'requests==2.32.0' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef notify_slack_component(\n    slack_webhook_url: str,\n    model_name:\
+          \ str,\n    version: str,\n    promotion_result: Input[Artifact],\n    ragas_report:\
+          \ Input[Artifact],\n) -> None:\n    \"\"\"\n    Post a Slack message summarising\
+          \ the RAGAS result and promotion decision.\n    Used at the end of P09 regardless\
+          \ of pass/fail.\n    \"\"\"\n    import json\n    import requests\n\n  \
+          \  with open(promotion_result.path) as f:\n        promo = json.load(f)\n\
+          \    with open(ragas_report.path) as f:\n        ragas = json.load(f)\n\n\
+          \    promoted = promo.get(\"promoted\", False)\n    icon = \":white_check_mark:\"\
+          \ if promoted else \":x:\"\n    status = \"Promoted to *Staging*\" if promoted\
+          \ else f\"*Blocked* \u2014 {promo.get('reason', 'unknown')}\"\n\n    text\
+          \ = (\n        f\"{icon} *P09 RAGAS Evaluation* \u2014 {model_name} v{version}\\\
+          n\"\n        f\"Status: {status}\\n\"\n        f\"Faithfulness: `{ragas.get('faithfulness',\
+          \ 'n/a'):.3f}` (target \u2265 0.90)\\n\"\n        f\"Hallucination: `{ragas.get('hallucination_rate',\
+          \ 'n/a'):.3f}` (target \u2264 0.10)\\n\"\n        f\"Answer Relevancy: `{ragas.get('answer_relevancy',\
+          \ 'n/a'):.3f}`\\n\"\n        f\"Samples: {ragas.get('sample_count', 'n/a')}\
+          \ | \"\n        f\"Eval time: {ragas.get('eval_seconds', 'n/a')}s\\n\"\n\
+          \        f\"MLflow run: `{ragas.get('mlflow_run_id', 'n/a')}`\"\n    )\n\
+          \n    if slack_webhook_url and slack_webhook_url.startswith(\"https://\"\
+          ):\n        try:\n            requests.post(slack_webhook_url, json={\"\
+          text\": text}, timeout=10)\n        except Exception as e:\n           \
+          \ print(f\"Slack notification failed: {e}\")\n\n    print(text)\n\n"
+        image: python:3.11-slim
+    exec-promote-to-staging-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - promote_to_staging_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.2.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'mlflow==2.12.0'\
+          \ 'boto3==1.34.0' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef promote_to_staging_component(\n    mlflow_tracking_uri: str,\n\
+          \    model_name: str,\n    version: str,\n    ragas_gate_passed: bool,\n\
+          \    ragas_report: Input[Artifact],\n    # Outputs\n    promotion_result:\
+          \ Output[Artifact],\n) -> bool:\n    \"\"\"\n    Promote a registered model\
+          \ version to the Staging stage IF the RAGAS\n    gate passed.  Writes a\
+          \ promotion_result artifact recording the decision.\n\n    Returns True\
+          \ if promoted, False if blocked.\n    \"\"\"\n    import json\n    import\
+          \ mlflow\n    from mlflow.tracking import MlflowClient\n\n    with open(ragas_report.path)\
+          \ as f:\n        ragas_data = json.load(f)\n\n    if not ragas_gate_passed:\n\
+          \        result = {\n            \"promoted\":      False,\n           \
+          \ \"reason\":        \"RAGAS gate failed\",\n            \"gate_failures\"\
+          : ragas_data.get(\"gate_failures\", []),\n        }\n        with open(promotion_result.path,\
+          \ \"w\") as f:\n            json.dump(result, f, indent=2)\n        print(f\"\
+          BLOCKED: RAGAS gate failed \u2014 {ragas_data.get('gate_failures')}\")\n\
+          \        return False\n\n    mlflow.set_tracking_uri(mlflow_tracking_uri)\n\
+          \    client = MlflowClient()\n\n    # Archive any existing Staging version\
+          \ before promoting\n    existing_staging = client.get_latest_versions(model_name,\
+          \ stages=[\"Staging\"])\n    for old_mv in existing_staging:\n        client.transition_model_version_stage(\n\
+          \            name=model_name,\n            version=old_mv.version,\n   \
+          \         stage=\"Archived\",\n        )\n        print(f\"Archived old\
+          \ staging version: {old_mv.version}\")\n\n    # Promote new version\n  \
+          \  client.transition_model_version_stage(\n        name=model_name,\n  \
+          \      version=version,\n        stage=\"Staging\",\n        archive_existing_versions=True,\n\
+          \    )\n\n    client.update_model_version(\n        name=model_name,\n \
+          \       version=version,\n        description=(\n            f\"Promoted\
+          \ to Staging by P09. \"\n            f\"RAGAS faithfulness={ragas_data.get('faithfulness',\
+          \ 'n/a'):.3f}, \"\n            f\"hallucination_rate={ragas_data.get('hallucination_rate',\
+          \ 'n/a'):.3f}\"\n        ),\n    )\n\n    result = {\n        \"promoted\"\
+          :            True,\n        \"model_name\":          model_name,\n     \
+          \   \"version\":             version,\n        \"stage\":              \
+          \ \"Staging\",\n        \"ragas_faithfulness\":  ragas_data.get(\"faithfulness\"\
+          ),\n        \"ragas_hallucination\": ragas_data.get(\"hallucination_rate\"\
+          ),\n        \"mlflow_run_id\":       ragas_data.get(\"mlflow_run_id\"),\n\
+          \    }\n    with open(promotion_result.path, \"w\") as f:\n        json.dump(result,\
+          \ f, indent=2)\n\n    print(f\"PROMOTED: {model_name} v{version} \u2192\
+          \ Staging\")\n    return True\n\n"
+        image: python:3.11-slim
+    exec-ragas-score-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - ragas_score_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.2.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'ragas==0.1.0'\
+          \ 'datasets==2.19.0' 'mlflow==2.12.0' 'boto3==1.34.0' 'langchain-community==0.0.38'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef ragas_score_component(\n    answered_dataset: Input[Dataset],\n\
+          \    mlflow_tracking_uri: str,\n    mlflow_experiment: str,\n    run_name:\
+          \ str,\n    faithfulness_hard_block: float,\n    hallucination_hard_block:\
+          \ float,\n    ragas_metrics_output: Output[Metrics],\n    ragas_report:\
+          \ Output[Artifact],\n    ollama_base_url: str = 'http://ollama-service.llm-platform-prod.svc.cluster.local:11434',\n\
+          \    ollama_model: str = 'mistral:7b',\n) -> bool:\n    \"\"\"\n    Compute\
+          \ all 6 RAGAS metrics and check the deployment gate.\n\n    Returns True\
+          \ (gate PASSED \u2014 allow deployment to staging) or\n            False\
+          \ (gate FAILED \u2014 block deployment, trigger P11 retraining).\n    \"\
+          \"\"\n    import json\n    import time\n    import os\n    os.environ[\"\
+          OPENAI_API_KEY\"] = \"dummy-not-used\"\n    import mlflow\n    from datasets\
+          \ import Dataset\n    from ragas import evaluate\n    from ragas.llms import\
+          \ LangchainLLMWrapper\n    from langchain_community.llms import Ollama\n\
+          \    from ragas.metrics import (\n        faithfulness, answer_relevancy,\n\
+          \        context_precision, context_recall, answer_correctness,\n    )\n\
+          \n    rows = []\n    with open(answered_dataset.path) as f:\n        for\
+          \ line in f:\n            rows.append(json.loads(line))\n\n    if not rows:\n\
+          \        raise ValueError(\"answered_dataset is empty\")\n\n    from datasets\
+          \ import Features, Sequence, Value\n    ds = Dataset.from_dict({\n     \
+          \   \"question\":     [r[\"question\"]     for r in rows],\n        \"answer\"\
+          :       [r[\"answer\"]       for r in rows],\n        \"contexts\":    \
+          \ [[str(c) for c in r[\"contexts\"]] for r in rows],\n        \"ground_truth\"\
+          : [r[\"ground_truth\"] for r in rows],\n    }, features=Features({\n   \
+          \     \"question\":     Value(\"string\"),\n        \"answer\":       Value(\"\
+          string\"),\n        \"contexts\":     Sequence(Value(\"string\")),\n   \
+          \     \"ground_truth\": Value(\"string\"),\n    }))\n\n    t0 = time.perf_counter()\n\
+          \    try:\n        ollama_llm = LangchainLLMWrapper(Ollama(base_url=ollama_base_url,\
+          \ model=ollama_model))\n        faithfulness.llm = ollama_llm\n        answer_relevancy.llm\
+          \ = ollama_llm\n        context_precision.llm = ollama_llm\n        context_recall.llm\
+          \ = ollama_llm\n        answer_correctness.llm = ollama_llm\n        print(f\"\
+          Using Ollama LLM: {ollama_base_url} model={ollama_model}\")\n    except\
+          \ Exception as e:\n        print(f'Warning: could not init Ollama LLM: {e}')\n\
+          \        import os\n        os.environ[\"OPENAI_API_KEY\"] = \"dummy-key-not-used\"\
+          \n    result = evaluate(ds, metrics=[\n        faithfulness, answer_relevancy,\n\
+          \        context_precision, context_recall, answer_correctness,\n    ])\n\
+          \    elapsed = round(time.perf_counter() - t0, 2)\n\n    df = result.to_pandas()\n\
+          \    scores = {\n        \"faithfulness\":       float(df[\"faithfulness\"\
+          ].mean()),\n        \"answer_relevancy\":   float(df[\"answer_relevancy\"\
+          ].mean()),\n        \"context_precision\":  float(df[\"context_precision\"\
+          ].mean()),\n        \"context_recall\":     float(df[\"context_recall\"\
+          ].mean()),\n        \"answer_correctness\": float(df[\"answer_correctness\"\
+          ].mean()),\n    }\n    scores[\"hallucination_rate\"] = round(1.0 - scores[\"\
+          faithfulness\"], 4)\n    scores[\"sample_count\"]  = len(rows)\n    scores[\"\
+          eval_seconds\"]  = elapsed\n\n    # Gate check\n    gate_failures = []\n\
+          \    if scores[\"faithfulness\"] < faithfulness_hard_block:\n        gate_failures.append(\n\
+          \            f\"faithfulness={scores['faithfulness']:.3f} < {faithfulness_hard_block}\"\
+          \n        )\n    if scores[\"hallucination_rate\"] > hallucination_hard_block:\n\
+          \        gate_failures.append(\n            f\"hallucination_rate={scores['hallucination_rate']:.3f}\
+          \ > {hallucination_hard_block}\"\n        )\n\n    scores[\"gate_passed\"\
+          ]    = len(gate_failures) == 0\n    scores[\"gate_failures\"]  = gate_failures\n\
+          \n    # Log to MLflow\n    mlflow.set_tracking_uri(mlflow_tracking_uri)\n\
+          \    mlflow.set_experiment(mlflow_experiment)\n    with mlflow.start_run(run_name=run_name)\
+          \ as run:\n        mlflow.log_metrics({k: v for k, v in scores.items() if\
+          \ isinstance(v, float)})\n        mlflow.log_param(\"sample_count\", len(rows))\n\
+          \        mlflow.set_tags({\n            \"gate_passed\":  str(scores[\"\
+          gate_passed\"]),\n            \"gate_failures\": \"|\".join(gate_failures)\
+          \ if gate_failures else \"none\",\n            \"pipeline\": \"P09-RAGAS\"\
+          ,\n        })\n\n    # Write KFP Metrics\n    for k, v in scores.items():\n\
+          \        if isinstance(v, (int, float)):\n            ragas_metrics_output.log_metric(k,\
+          \ v)\n\n    # Write full report artifact\n    report = {\"mlflow_run_id\"\
+          : run.info.run_id, **scores}\n    with open(ragas_report.path, \"w\") as\
+          \ f:\n        json.dump(report, f, indent=2)\n\n    status = \"PASSED\"\
+          \ if scores[\"gate_passed\"] else f\"FAILED: {gate_failures}\"\n    print(f\"\
+          RAGAS Gate: {status}\")\n    return scores[\"gate_passed\"]\n\n"
+        image: 659071697671.dkr.ecr.us-east-1.amazonaws.com/llm-platform/pipeline-base:latest
+    exec-retrieve-contexts-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - retrieve_contexts_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.2.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'qdrant-client==1.8.0'\
+          \ 'sentence-transformers==2.7.0' 'psycopg2-binary==2.9.9' && \"$0\" \"$@\"\
+          \n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef retrieve_contexts_component(\n    qdrant_host: str,\n    qdrant_port:\
+          \ int,\n    embedding_model: str,\n    collection_names: str,          \
+          \  # JSON list: '[\"tech_docs\",\"hr_policies\",\"org_info\"]'\n    top_k:\
+          \ int,\n    domain_filter: str,               # \"tech\" | \"hr\" | \"org\"\
+          \ | \"\" (all)\n    postgres_host: str,\n    postgres_db: str,\n    postgres_user:\
+          \ str,\n    postgres_password: str,\n    qa_limit: int,\n    # Outputs\n\
+          \    retrieval_dataset: Output[Dataset],\n) -> int:\n    \"\"\"\n    Load\
+          \ golden QA pairs from PostgreSQL, retrieve top-k contexts from Qdrant\n\
+          \    for each question, and write (question, contexts, ground_truth, domain)\n\
+          \    rows to a JSON-lines dataset artifact.\n\n    Returns the number of\
+          \ questions processed.\n    \"\"\"\n    import json\n    import os\n   \
+          \ import psycopg2\n    import psycopg2.extras\n    from qdrant_client import\
+          \ QdrantClient\n    from sentence_transformers import SentenceTransformer\n\
+          \n    # \u2500\u2500 Load QA pairs \u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+          \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+          \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+          \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+          \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+          \u2500\u2500\n    conn = psycopg2.connect(\n        host=postgres_host,\
+          \ dbname=postgres_db,\n        user=postgres_user, password=postgres_password,\n\
+          \    )\n    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor)\
+          \ as cur:\n        where = \"active = TRUE\"\n        params = []\n    \
+          \    if domain_filter:\n            where += \" AND domain = %s\"\n    \
+          \        params.append(domain_filter)\n        params.append(qa_limit)\n\
+          \        cur.execute(\n            f\"SELECT question, ground_truth, domain\
+          \ FROM golden_qa WHERE {where} LIMIT %s\",\n            params,\n      \
+          \  )\n        pairs = cur.fetchall()\n    conn.close()\n\n    if not pairs:\n\
+          \        raise ValueError(\"No QA pairs found in golden_qa table\")\n\n\
+          \    # \u2500\u2500 Embed questions \u2500\u2500\u2500\u2500\u2500\u2500\
+          \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+          \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+          \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+          \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+          \u2500\n    model = SentenceTransformer(embedding_model)\n    questions\
+          \ = [r[\"question\"] for r in pairs]\n    vectors = model.encode(questions,\
+          \ normalize_embeddings=True, convert_to_numpy=True)\n\n    # \u2500\u2500\
+          \ Retrieve from Qdrant \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+          \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+          \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+          \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+          \u2500\u2500\u2500\u2500\u2500\n    qclient = QdrantClient(host=qdrant_host,\
+          \ port=qdrant_port, timeout=30)\n    collections = json.loads(collection_names)\n\
+          \n    rows = []\n    for i, (pair, vector) in enumerate(zip(pairs, vectors)):\n\
+          \        all_hits = []\n        for col in collections:\n            try:\n\
+          \                hits = qclient.search(\n                    collection_name=col,\n\
+          \                    query_vector=vector.tolist(),\n                   \
+          \ limit=top_k,\n                    with_payload=True,\n               \
+          \ )\n                all_hits.extend(hits)\n            except Exception:\n\
+          \                pass  # collection may not exist for this domain\n\n  \
+          \      # Re-rank across collections by score, take top_k total\n       \
+          \ all_hits.sort(key=lambda h: h.score, reverse=True)\n        contexts =\
+          \ [h.payload.get(\"text\", \"\") for h in all_hits[:top_k]]\n\n        rows.append({\n\
+          \            \"question\":    pair[\"question\"],\n            \"ground_truth\"\
+          : pair[\"ground_truth\"],\n            \"domain\":      pair[\"domain\"\
+          ],\n            \"contexts\":    contexts,\n            \"answer\":    \
+          \  \"\",            # filled by next component\n        })\n\n    with open(retrieval_dataset.path,\
+          \ \"w\") as f:\n        for row in rows:\n            f.write(json.dumps(row)\
+          \ + \"\\n\")\n\n    return len(rows)\n\n"
+        image: 659071697671.dkr.ecr.us-east-1.amazonaws.com/llm-platform/pipeline-base:latest
+pipelineInfo:
+  description: 'RAGAS evaluation: retrieve -> generate -> score -> gate -> promote/block'
+  name: p09-ragas-evaluation
+root:
+  dag:
+    outputs:
+      artifacts:
+        ragas-score-component-ragas_metrics_output:
+          artifactSelectors:
+          - outputArtifactKey: ragas_metrics_output
+            producerSubtask: ragas-score-component
+    tasks:
+      condition-1:
+        componentRef:
+          name: comp-condition-1
+        dependentTasks:
+        - ragas-score-component
+        inputs:
+          artifacts:
+            pipelinechannel--ragas-score-component-ragas_report:
+              taskOutputArtifact:
+                outputArtifactKey: ragas_report
+                producerTask: ragas-score-component
+          parameters:
+            pipelinechannel--mlflow_tracking_uri:
+              componentInputParameter: mlflow_tracking_uri
+            pipelinechannel--model_name:
+              componentInputParameter: model_name
+            pipelinechannel--model_version:
+              componentInputParameter: model_version
+            pipelinechannel--ragas-score-component-Output:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: ragas-score-component
+            pipelinechannel--slack_webhook_url:
+              componentInputParameter: slack_webhook_url
+        taskInfo:
+          name: gate-passed
+        triggerPolicy:
+          condition: inputs.parameter_values['pipelinechannel--ragas-score-component-Output']
+            == true
+      condition-2:
+        componentRef:
+          name: comp-condition-2
+        dependentTasks:
+        - ragas-score-component
+        inputs:
+          artifacts:
+            pipelinechannel--ragas-score-component-ragas_report:
+              taskOutputArtifact:
+                outputArtifactKey: ragas_report
+                producerTask: ragas-score-component
+          parameters:
+            pipelinechannel--kubeflow_p11_webhook_url:
+              componentInputParameter: kubeflow_p11_webhook_url
+            pipelinechannel--model_name:
+              componentInputParameter: model_name
+            pipelinechannel--model_version:
+              componentInputParameter: model_version
+            pipelinechannel--ragas-score-component-Output:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: ragas-score-component
+            pipelinechannel--slack_webhook_url:
+              componentInputParameter: slack_webhook_url
+        taskInfo:
+          name: gate-failed
+        triggerPolicy:
+          condition: inputs.parameter_values['pipelinechannel--ragas-score-component-Output']
+            == false
+      generate-answers-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-generate-answers-component
+        dependentTasks:
+        - retrieve-contexts-component
+        inputs:
+          artifacts:
+            retrieval_dataset:
+              taskOutputArtifact:
+                outputArtifactKey: retrieval_dataset
+                producerTask: retrieve-contexts-component
+          parameters:
+            max_tokens:
+              componentInputParameter: max_tokens
+            model_name:
+              componentInputParameter: ollama_model
+            ollama_base_url:
+              componentInputParameter: ollama_base_url
+        taskInfo:
+          name: generate-answers-component
+      ragas-score-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-ragas-score-component
+        dependentTasks:
+        - generate-answers-component
+        inputs:
+          artifacts:
+            answered_dataset:
+              taskOutputArtifact:
+                outputArtifactKey: answered_dataset
+                producerTask: generate-answers-component
+          parameters:
+            faithfulness_hard_block:
+              componentInputParameter: faithfulness_hard_block
+            hallucination_hard_block:
+              componentInputParameter: hallucination_hard_block
+            mlflow_experiment:
+              componentInputParameter: mlflow_experiment
+            mlflow_tracking_uri:
+              componentInputParameter: mlflow_tracking_uri
+            run_name:
+              componentInputParameter: run_name
+        taskInfo:
+          name: ragas-score-component
+      retrieve-contexts-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-retrieve-contexts-component
+        inputs:
+          parameters:
+            collection_names:
+              componentInputParameter: collection_names
+            domain_filter:
+              componentInputParameter: domain_filter
+            embedding_model:
+              componentInputParameter: embedding_model
+            postgres_db:
+              componentInputParameter: postgres_db
+            postgres_host:
+              componentInputParameter: postgres_host
+            postgres_password:
+              componentInputParameter: postgres_password
+            postgres_user:
+              componentInputParameter: postgres_user
+            qa_limit:
+              componentInputParameter: qa_limit
+            qdrant_host:
+              componentInputParameter: qdrant_host
+            qdrant_port:
+              componentInputParameter: qdrant_port
+            top_k:
+              componentInputParameter: top_k
+        taskInfo:
+          name: retrieve-contexts-component
+  inputDefinitions:
+    parameters:
+      collection_names:
+        defaultValue: '["tech_docs","hr_policies","org_info"]'
+        isOptional: true
+        parameterType: STRING
+      domain_filter:
+        defaultValue: ''
+        isOptional: true
+        parameterType: STRING
+      embedding_model:
+        defaultValue: all-MiniLM-L6-v2
+        isOptional: true
+        parameterType: STRING
+      faithfulness_hard_block:
+        defaultValue: 0.85
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      hallucination_hard_block:
+        defaultValue: 0.15
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      kubeflow_p11_webhook_url:
+        defaultValue: ''
+        isOptional: true
+        parameterType: STRING
+      max_tokens:
+        defaultValue: 512.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      min_pairs_per_domain:
+        defaultValue: 20.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      mlflow_experiment:
+        defaultValue: ragas-evaluation
+        isOptional: true
+        parameterType: STRING
+      mlflow_tracking_uri:
+        defaultValue: http://172.20.232.117:80
+        isOptional: true
+        parameterType: STRING
+      model_name:
+        defaultValue: llm-platform-rag-config
+        isOptional: true
+        parameterType: STRING
+      model_version:
+        defaultValue: latest
+        isOptional: true
+        parameterType: STRING
+      ollama_base_url:
+        defaultValue: http://ollama-service.llm-platform-prod.svc.cluster.local:11434
+        isOptional: true
+        parameterType: STRING
+      ollama_model:
+        defaultValue: mistral:7b
+        isOptional: true
+        parameterType: STRING
+      postgres_db:
+        defaultValue: llm_platform
+        isOptional: true
+        parameterType: STRING
+      postgres_host:
+        defaultValue: llm-platform-prod-postgres.c2xig0uywkrb.us-east-1.rds.amazonaws.com
+        isOptional: true
+        parameterType: STRING
+      postgres_password:
+        defaultValue: Llmplatform2026
+        isOptional: true
+        parameterType: STRING
+      postgres_user:
+        defaultValue: llm_admin
+        isOptional: true
+        parameterType: STRING
+      qa_limit:
+        defaultValue: 200.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      qdrant_host:
+        defaultValue: qdrant-service.llm-platform-prod.svc.cluster.local
+        isOptional: true
+        parameterType: STRING
+      qdrant_port:
+        defaultValue: 6333.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      run_name:
+        defaultValue: ragas-weekly
+        isOptional: true
+        parameterType: STRING
+      slack_webhook_url:
+        defaultValue: ''
+        isOptional: true
+        parameterType: STRING
+      top_k:
+        defaultValue: 5.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+  outputDefinitions:
+    artifacts:
+      ragas-score-component-ragas_metrics_output:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.2.0

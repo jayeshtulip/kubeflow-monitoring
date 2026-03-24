@@ -1,0 +1,622 @@
+# PIPELINE DEFINITION
+# Name: p01-model-evaluation
+# Description: Test all 4 LangGraph workflows. 5 queries x 4 = 20 test cases.
+# Inputs:
+#    api_base_url: str [Default: 'http://llm-gateway.llm-platform-prod.svc.cluster.local:8000']
+#    mlflow_tracking_uri: str [Default: 'http://172.20.232.117:80']
+#    test_queries_json: str [Default: '["Why is the payment service timing out?", "What is the leave policy?", "How do I restart a pod?", "What are the RDS connection limits?"]']
+#    timeout_seconds: int [Default: 90.0]
+# Outputs:
+#    run-workflow-tests-component-2-test_metrics: system.Metrics
+#    run-workflow-tests-component-3-test_metrics: system.Metrics
+#    run-workflow-tests-component-4-test_metrics: system.Metrics
+#    run-workflow-tests-component-test_metrics: system.Metrics
+components:
+  comp-compare-workflows-component:
+    executorLabel: exec-compare-workflows-component
+    inputDefinitions:
+      artifacts:
+        react_results:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        simple_results:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        smart_results:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        tools_results:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        mlflow_tracking_uri:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        comparison_report:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-run-workflow-tests-component:
+    executorLabel: exec-run-workflow-tests-component
+    inputDefinitions:
+      parameters:
+        api_base_url:
+          parameterType: STRING
+        mlflow_tracking_uri:
+          parameterType: STRING
+        test_queries_json:
+          parameterType: STRING
+        timeout_seconds:
+          parameterType: NUMBER_INTEGER
+        workflow_type:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        test_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        test_results:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: NUMBER_DOUBLE
+  comp-run-workflow-tests-component-2:
+    executorLabel: exec-run-workflow-tests-component-2
+    inputDefinitions:
+      parameters:
+        api_base_url:
+          parameterType: STRING
+        mlflow_tracking_uri:
+          parameterType: STRING
+        test_queries_json:
+          parameterType: STRING
+        timeout_seconds:
+          parameterType: NUMBER_INTEGER
+        workflow_type:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        test_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        test_results:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: NUMBER_DOUBLE
+  comp-run-workflow-tests-component-3:
+    executorLabel: exec-run-workflow-tests-component-3
+    inputDefinitions:
+      parameters:
+        api_base_url:
+          parameterType: STRING
+        mlflow_tracking_uri:
+          parameterType: STRING
+        test_queries_json:
+          parameterType: STRING
+        timeout_seconds:
+          parameterType: NUMBER_INTEGER
+        workflow_type:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        test_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        test_results:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: NUMBER_DOUBLE
+  comp-run-workflow-tests-component-4:
+    executorLabel: exec-run-workflow-tests-component-4
+    inputDefinitions:
+      parameters:
+        api_base_url:
+          parameterType: STRING
+        mlflow_tracking_uri:
+          parameterType: STRING
+        test_queries_json:
+          parameterType: STRING
+        timeout_seconds:
+          parameterType: NUMBER_INTEGER
+        workflow_type:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        test_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        test_results:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: NUMBER_DOUBLE
+deploymentSpec:
+  executors:
+    exec-compare-workflows-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - compare_workflows_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.2.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'mlflow==2.12.2'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef compare_workflows_component(\n    simple_results:  Input[Artifact],\n\
+          \    tools_results:   Input[Artifact],\n    smart_results:   Input[Artifact],\n\
+          \    react_results:   Input[Artifact],\n    mlflow_tracking_uri: str,\n\
+          \    comparison_report: Output[Artifact],\n) -> str:\n    \"\"\"Aggregate\
+          \ all 4 workflow results. Returns name of best workflow.\"\"\"\n    import\
+          \ json, mlflow\n\n    workflows = {}\n    for name, artifact in [\n    \
+          \    (\"simple\", simple_results),\n        (\"tools\",  tools_results),\n\
+          \        (\"smart\",  smart_results),\n        (\"react\",  react_results),\n\
+          \    ]:\n        try:\n            with open(artifact.path) as f:\n    \
+          \            workflows[name] = json.load(f)\n        except Exception as\
+          \ exc:\n            workflows[name] = {\"metrics\": {\"success_rate\": 0,\
+          \ \"p95_latency_ms\": 999999, \"avg_latency_ms\": 999999, \"total_queries\"\
+          : 0}, \"error\": str(exc)}\n\n    best = max(workflows, key=lambda w: workflows[w][\"\
+          metrics\"][\"success_rate\"])\n    comparison = {\n        \"best_workflow\"\
+          : best,\n        \"workflows\": {k: v[\"metrics\"] for k, v in workflows.items()},\n\
+          \    }\n\n    mlflow.set_tracking_uri(mlflow_tracking_uri)\n    mlflow.set_experiment(\"\
+          workflow-evaluation\")\n    with mlflow.start_run(run_name=\"workflow-comparison\"\
+          ):\n        for wf, data in workflows.items():\n            for k, v in\
+          \ data[\"metrics\"].items():\n                mlflow.log_metric(f\"{wf}_{k}\"\
+          , v)\n        mlflow.set_tag(\"best_workflow\", best)\n\n    with open(comparison_report.path,\
+          \ \"w\") as fh:\n        json.dump(comparison, fh, indent=2)\n\n    print(f\"\
+          Best workflow: {best}\")\n    return best\n\n"
+        image: python:3.11-slim
+    exec-run-workflow-tests-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - run_workflow_tests_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.2.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'httpx==0.27.0'\
+          \ 'mlflow==2.12.2' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef run_workflow_tests_component(\n    api_base_url: str,\n    workflow_type:\
+          \ str,\n    test_queries_json: str,\n    timeout_seconds: int,\n    mlflow_tracking_uri:\
+          \ str,\n    test_results: Output[Artifact],\n    test_metrics: Output[Metrics],\n\
+          ) -> float:\n    \"\"\"Run test queries against a specific LangGraph workflow\
+          \ type.\"\"\"\n    import json, time, mlflow\n    import httpx\n\n    queries\
+          \ = json.loads(test_queries_json)\n    results = []\n    latencies = []\n\
+          \n    mlflow.set_tracking_uri(mlflow_tracking_uri)\n    mlflow.set_experiment(\"\
+          workflow-evaluation\")\n\n    with mlflow.start_run(run_name=f\"{workflow_type}-evaluation\"\
+          ):\n        for query in queries:\n            try:\n                t0\
+          \ = time.perf_counter()\n                resp = httpx.post(\n          \
+          \          f\"{api_base_url}/query\",\n                    json={\"query\"\
+          : query, \"workflow_hint\": workflow_type},\n                    timeout=timeout_seconds,\n\
+          \                )\n                latency_ms = (time.perf_counter() -\
+          \ t0) * 1000\n                success = resp.status_code == 200\n      \
+          \          results.append({\"query\": query, \"success\": success, \"latency_ms\"\
+          : latency_ms})\n                latencies.append(latency_ms)\n         \
+          \   except Exception as exc:\n                results.append({\"query\"\
+          : query, \"success\": False, \"latency_ms\": timeout_seconds * 1000, \"\
+          error\": str(exc)})\n                latencies.append(timeout_seconds *\
+          \ 1000)\n\n        success_rate = sum(r[\"success\"] for r in results) /\
+          \ len(results)\n        p95_latency  = sorted(latencies)[int(len(latencies)\
+          \ * 0.95)]\n        avg_latency  = sum(latencies) / len(latencies)\n\n \
+          \       metrics = {\n            \"success_rate\": success_rate,\n     \
+          \       \"p95_latency_ms\": p95_latency,\n            \"avg_latency_ms\"\
+          : avg_latency,\n            \"total_queries\": len(results),\n        }\n\
+          \n        mlflow.log_metrics(metrics)\n        mlflow.set_tag(\"workflow_type\"\
+          , workflow_type)\n\n        report = {\"workflow_type\": workflow_type,\
+          \ \"metrics\": metrics, \"results\": results}\n        with open(test_results.path,\
+          \ \"w\") as f:\n            json.dump(report, f, indent=2)\n        for\
+          \ k, v in metrics.items():\n            test_metrics.log_metric(k, v)\n\n\
+          \        print(f\"Workflow {workflow_type}: success={success_rate:.2%} p95={p95_latency:.0f}ms\"\
+          )\n        return success_rate\n\n"
+        image: python:3.11-slim
+    exec-run-workflow-tests-component-2:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - run_workflow_tests_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.2.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'httpx==0.27.0'\
+          \ 'mlflow==2.12.2' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef run_workflow_tests_component(\n    api_base_url: str,\n    workflow_type:\
+          \ str,\n    test_queries_json: str,\n    timeout_seconds: int,\n    mlflow_tracking_uri:\
+          \ str,\n    test_results: Output[Artifact],\n    test_metrics: Output[Metrics],\n\
+          ) -> float:\n    \"\"\"Run test queries against a specific LangGraph workflow\
+          \ type.\"\"\"\n    import json, time, mlflow\n    import httpx\n\n    queries\
+          \ = json.loads(test_queries_json)\n    results = []\n    latencies = []\n\
+          \n    mlflow.set_tracking_uri(mlflow_tracking_uri)\n    mlflow.set_experiment(\"\
+          workflow-evaluation\")\n\n    with mlflow.start_run(run_name=f\"{workflow_type}-evaluation\"\
+          ):\n        for query in queries:\n            try:\n                t0\
+          \ = time.perf_counter()\n                resp = httpx.post(\n          \
+          \          f\"{api_base_url}/query\",\n                    json={\"query\"\
+          : query, \"workflow_hint\": workflow_type},\n                    timeout=timeout_seconds,\n\
+          \                )\n                latency_ms = (time.perf_counter() -\
+          \ t0) * 1000\n                success = resp.status_code == 200\n      \
+          \          results.append({\"query\": query, \"success\": success, \"latency_ms\"\
+          : latency_ms})\n                latencies.append(latency_ms)\n         \
+          \   except Exception as exc:\n                results.append({\"query\"\
+          : query, \"success\": False, \"latency_ms\": timeout_seconds * 1000, \"\
+          error\": str(exc)})\n                latencies.append(timeout_seconds *\
+          \ 1000)\n\n        success_rate = sum(r[\"success\"] for r in results) /\
+          \ len(results)\n        p95_latency  = sorted(latencies)[int(len(latencies)\
+          \ * 0.95)]\n        avg_latency  = sum(latencies) / len(latencies)\n\n \
+          \       metrics = {\n            \"success_rate\": success_rate,\n     \
+          \       \"p95_latency_ms\": p95_latency,\n            \"avg_latency_ms\"\
+          : avg_latency,\n            \"total_queries\": len(results),\n        }\n\
+          \n        mlflow.log_metrics(metrics)\n        mlflow.set_tag(\"workflow_type\"\
+          , workflow_type)\n\n        report = {\"workflow_type\": workflow_type,\
+          \ \"metrics\": metrics, \"results\": results}\n        with open(test_results.path,\
+          \ \"w\") as f:\n            json.dump(report, f, indent=2)\n        for\
+          \ k, v in metrics.items():\n            test_metrics.log_metric(k, v)\n\n\
+          \        print(f\"Workflow {workflow_type}: success={success_rate:.2%} p95={p95_latency:.0f}ms\"\
+          )\n        return success_rate\n\n"
+        image: python:3.11-slim
+    exec-run-workflow-tests-component-3:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - run_workflow_tests_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.2.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'httpx==0.27.0'\
+          \ 'mlflow==2.12.2' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef run_workflow_tests_component(\n    api_base_url: str,\n    workflow_type:\
+          \ str,\n    test_queries_json: str,\n    timeout_seconds: int,\n    mlflow_tracking_uri:\
+          \ str,\n    test_results: Output[Artifact],\n    test_metrics: Output[Metrics],\n\
+          ) -> float:\n    \"\"\"Run test queries against a specific LangGraph workflow\
+          \ type.\"\"\"\n    import json, time, mlflow\n    import httpx\n\n    queries\
+          \ = json.loads(test_queries_json)\n    results = []\n    latencies = []\n\
+          \n    mlflow.set_tracking_uri(mlflow_tracking_uri)\n    mlflow.set_experiment(\"\
+          workflow-evaluation\")\n\n    with mlflow.start_run(run_name=f\"{workflow_type}-evaluation\"\
+          ):\n        for query in queries:\n            try:\n                t0\
+          \ = time.perf_counter()\n                resp = httpx.post(\n          \
+          \          f\"{api_base_url}/query\",\n                    json={\"query\"\
+          : query, \"workflow_hint\": workflow_type},\n                    timeout=timeout_seconds,\n\
+          \                )\n                latency_ms = (time.perf_counter() -\
+          \ t0) * 1000\n                success = resp.status_code == 200\n      \
+          \          results.append({\"query\": query, \"success\": success, \"latency_ms\"\
+          : latency_ms})\n                latencies.append(latency_ms)\n         \
+          \   except Exception as exc:\n                results.append({\"query\"\
+          : query, \"success\": False, \"latency_ms\": timeout_seconds * 1000, \"\
+          error\": str(exc)})\n                latencies.append(timeout_seconds *\
+          \ 1000)\n\n        success_rate = sum(r[\"success\"] for r in results) /\
+          \ len(results)\n        p95_latency  = sorted(latencies)[int(len(latencies)\
+          \ * 0.95)]\n        avg_latency  = sum(latencies) / len(latencies)\n\n \
+          \       metrics = {\n            \"success_rate\": success_rate,\n     \
+          \       \"p95_latency_ms\": p95_latency,\n            \"avg_latency_ms\"\
+          : avg_latency,\n            \"total_queries\": len(results),\n        }\n\
+          \n        mlflow.log_metrics(metrics)\n        mlflow.set_tag(\"workflow_type\"\
+          , workflow_type)\n\n        report = {\"workflow_type\": workflow_type,\
+          \ \"metrics\": metrics, \"results\": results}\n        with open(test_results.path,\
+          \ \"w\") as f:\n            json.dump(report, f, indent=2)\n        for\
+          \ k, v in metrics.items():\n            test_metrics.log_metric(k, v)\n\n\
+          \        print(f\"Workflow {workflow_type}: success={success_rate:.2%} p95={p95_latency:.0f}ms\"\
+          )\n        return success_rate\n\n"
+        image: python:3.11-slim
+    exec-run-workflow-tests-component-4:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - run_workflow_tests_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.2.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'httpx==0.27.0'\
+          \ 'mlflow==2.12.2' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef run_workflow_tests_component(\n    api_base_url: str,\n    workflow_type:\
+          \ str,\n    test_queries_json: str,\n    timeout_seconds: int,\n    mlflow_tracking_uri:\
+          \ str,\n    test_results: Output[Artifact],\n    test_metrics: Output[Metrics],\n\
+          ) -> float:\n    \"\"\"Run test queries against a specific LangGraph workflow\
+          \ type.\"\"\"\n    import json, time, mlflow\n    import httpx\n\n    queries\
+          \ = json.loads(test_queries_json)\n    results = []\n    latencies = []\n\
+          \n    mlflow.set_tracking_uri(mlflow_tracking_uri)\n    mlflow.set_experiment(\"\
+          workflow-evaluation\")\n\n    with mlflow.start_run(run_name=f\"{workflow_type}-evaluation\"\
+          ):\n        for query in queries:\n            try:\n                t0\
+          \ = time.perf_counter()\n                resp = httpx.post(\n          \
+          \          f\"{api_base_url}/query\",\n                    json={\"query\"\
+          : query, \"workflow_hint\": workflow_type},\n                    timeout=timeout_seconds,\n\
+          \                )\n                latency_ms = (time.perf_counter() -\
+          \ t0) * 1000\n                success = resp.status_code == 200\n      \
+          \          results.append({\"query\": query, \"success\": success, \"latency_ms\"\
+          : latency_ms})\n                latencies.append(latency_ms)\n         \
+          \   except Exception as exc:\n                results.append({\"query\"\
+          : query, \"success\": False, \"latency_ms\": timeout_seconds * 1000, \"\
+          error\": str(exc)})\n                latencies.append(timeout_seconds *\
+          \ 1000)\n\n        success_rate = sum(r[\"success\"] for r in results) /\
+          \ len(results)\n        p95_latency  = sorted(latencies)[int(len(latencies)\
+          \ * 0.95)]\n        avg_latency  = sum(latencies) / len(latencies)\n\n \
+          \       metrics = {\n            \"success_rate\": success_rate,\n     \
+          \       \"p95_latency_ms\": p95_latency,\n            \"avg_latency_ms\"\
+          : avg_latency,\n            \"total_queries\": len(results),\n        }\n\
+          \n        mlflow.log_metrics(metrics)\n        mlflow.set_tag(\"workflow_type\"\
+          , workflow_type)\n\n        report = {\"workflow_type\": workflow_type,\
+          \ \"metrics\": metrics, \"results\": results}\n        with open(test_results.path,\
+          \ \"w\") as f:\n            json.dump(report, f, indent=2)\n        for\
+          \ k, v in metrics.items():\n            test_metrics.log_metric(k, v)\n\n\
+          \        print(f\"Workflow {workflow_type}: success={success_rate:.2%} p95={p95_latency:.0f}ms\"\
+          )\n        return success_rate\n\n"
+        image: python:3.11-slim
+pipelineInfo:
+  description: Test all 4 LangGraph workflows. 5 queries x 4 = 20 test cases.
+  name: p01-model-evaluation
+root:
+  dag:
+    outputs:
+      artifacts:
+        run-workflow-tests-component-2-test_metrics:
+          artifactSelectors:
+          - outputArtifactKey: test_metrics
+            producerSubtask: run-workflow-tests-component-2
+        run-workflow-tests-component-3-test_metrics:
+          artifactSelectors:
+          - outputArtifactKey: test_metrics
+            producerSubtask: run-workflow-tests-component-3
+        run-workflow-tests-component-4-test_metrics:
+          artifactSelectors:
+          - outputArtifactKey: test_metrics
+            producerSubtask: run-workflow-tests-component-4
+        run-workflow-tests-component-test_metrics:
+          artifactSelectors:
+          - outputArtifactKey: test_metrics
+            producerSubtask: run-workflow-tests-component
+    tasks:
+      compare-workflows-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-compare-workflows-component
+        dependentTasks:
+        - run-workflow-tests-component
+        - run-workflow-tests-component-2
+        - run-workflow-tests-component-3
+        - run-workflow-tests-component-4
+        inputs:
+          artifacts:
+            react_results:
+              taskOutputArtifact:
+                outputArtifactKey: test_results
+                producerTask: run-workflow-tests-component-4
+            simple_results:
+              taskOutputArtifact:
+                outputArtifactKey: test_results
+                producerTask: run-workflow-tests-component
+            smart_results:
+              taskOutputArtifact:
+                outputArtifactKey: test_results
+                producerTask: run-workflow-tests-component-3
+            tools_results:
+              taskOutputArtifact:
+                outputArtifactKey: test_results
+                producerTask: run-workflow-tests-component-2
+          parameters:
+            mlflow_tracking_uri:
+              componentInputParameter: mlflow_tracking_uri
+        taskInfo:
+          name: compare-workflows-component
+      run-workflow-tests-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-run-workflow-tests-component
+        inputs:
+          parameters:
+            api_base_url:
+              componentInputParameter: api_base_url
+            mlflow_tracking_uri:
+              componentInputParameter: mlflow_tracking_uri
+            test_queries_json:
+              componentInputParameter: test_queries_json
+            timeout_seconds:
+              componentInputParameter: timeout_seconds
+            workflow_type:
+              runtimeValue:
+                constant: simple
+        taskInfo:
+          name: run-workflow-tests-component
+      run-workflow-tests-component-2:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-run-workflow-tests-component-2
+        inputs:
+          parameters:
+            api_base_url:
+              componentInputParameter: api_base_url
+            mlflow_tracking_uri:
+              componentInputParameter: mlflow_tracking_uri
+            test_queries_json:
+              componentInputParameter: test_queries_json
+            timeout_seconds:
+              componentInputParameter: timeout_seconds
+            workflow_type:
+              runtimeValue:
+                constant: tools
+        taskInfo:
+          name: run-workflow-tests-component-2
+      run-workflow-tests-component-3:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-run-workflow-tests-component-3
+        inputs:
+          parameters:
+            api_base_url:
+              componentInputParameter: api_base_url
+            mlflow_tracking_uri:
+              componentInputParameter: mlflow_tracking_uri
+            test_queries_json:
+              componentInputParameter: test_queries_json
+            timeout_seconds:
+              componentInputParameter: timeout_seconds
+            workflow_type:
+              runtimeValue:
+                constant: smart
+        taskInfo:
+          name: run-workflow-tests-component-3
+      run-workflow-tests-component-4:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-run-workflow-tests-component-4
+        inputs:
+          parameters:
+            api_base_url:
+              componentInputParameter: api_base_url
+            mlflow_tracking_uri:
+              componentInputParameter: mlflow_tracking_uri
+            test_queries_json:
+              componentInputParameter: test_queries_json
+            timeout_seconds:
+              componentInputParameter: timeout_seconds
+            workflow_type:
+              runtimeValue:
+                constant: react
+        taskInfo:
+          name: run-workflow-tests-component-4
+  inputDefinitions:
+    parameters:
+      api_base_url:
+        defaultValue: http://llm-gateway.llm-platform-prod.svc.cluster.local:8000
+        isOptional: true
+        parameterType: STRING
+      mlflow_tracking_uri:
+        defaultValue: http://172.20.232.117:80
+        isOptional: true
+        parameterType: STRING
+      test_queries_json:
+        defaultValue: '["Why is the payment service timing out?", "What is the leave
+          policy?", "How do I restart a pod?", "What are the RDS connection limits?"]'
+        isOptional: true
+        parameterType: STRING
+      timeout_seconds:
+        defaultValue: 90.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+  outputDefinitions:
+    artifacts:
+      run-workflow-tests-component-2-test_metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+      run-workflow-tests-component-3-test_metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+      run-workflow-tests-component-4-test_metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+      run-workflow-tests-component-test_metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.2.0

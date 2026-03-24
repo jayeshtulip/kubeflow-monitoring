@@ -1,0 +1,15 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mysql-init
+  namespace: kubeflow
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: mysql-client
+          image: mysql:8.0.26
+          command: ["/bin/sh", "-c"]
+          args:
+            - mysql -h mysql -u root -e "ALTER USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY ''; CREATE DATABASE IF NOT EXISTS mlpipeline; CREATE DATABASE IF NOT EXISTS metadb; FLUSH PRIVILEGES;" && echo "Done"

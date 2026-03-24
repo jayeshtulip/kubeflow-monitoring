@@ -1,0 +1,48 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# DVC
+/data/raw/
+/data/processed/
+/models/checkpoints/
+*.dvc.lock
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfplan
+.terraform.lock.hcl
+
+# Secrets (NEVER commit these)
+*.env
+.env.*
+secrets/
+**/secret*.yaml
+**/secret*.json
+
+# Docker
+*.tar
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

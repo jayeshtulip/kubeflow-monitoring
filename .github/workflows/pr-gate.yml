@@ -1,0 +1,47 @@
+name: PR Gate — Lint + L1/L2 Tests
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: pr-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install linters
+        run: pip install ruff==0.4.2 mypy==1.10.0
+      - name: Ruff lint
+        run: ruff check src/ pipelines/ tests/ mlops/
+      - name: Import check all source files
+        run: |
+          pip install -r requirements.txt
+          python -c "from src.api.main import app; print('OK')"
+          python -c "from src.agents.router.workflow_router import route_query; print('OK')"
+          python -c "from src.guardrails.input_validator import validate_input; print('OK')"
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install deps
+        run: pip install -r requirements.txt pytest pytest-timeout
+      - name: Run L1 infrastructure tests (mocked)
+        run: pytest tests/l1_infrastructure/ -m "l1 and not aws" -v --timeout=30
+      - name: Run L2 component tests (mocked)
+        run: pytest tests/l2_component/ -m "l2 and not live" -v --timeout=30

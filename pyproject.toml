@@ -1,0 +1,22 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --tb=short"
+markers = [
+    "l1: Infrastructure tests",
+    "l2: Component tests",
+    "l3: Integration tests",
+    "l4: Performance tests",
+    "aws: Tests requiring live AWS resources",
+    "live: Tests requiring live service endpoints",
+    "slow: Tests taking more than 30 seconds",
+]
+
+[tool.black]
+line-length = 100
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true

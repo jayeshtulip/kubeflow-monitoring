@@ -1,0 +1,142 @@
+[
+  {
+    "question": "Why is my EKS payment service timing out?",
+    "ground_truth": "Pod evictions caused by memory pressure from the daily-report-generator CronJob led to orphaned RDS connections and connection pool exhaustion, causing timeouts.",
+    "domain": "tech",
+    "category": "eks_incidents",
+    "source_doc_id": "JIRA-1001"
+  },
+  {
+    "question": "How do I restart a crashed pod in Kubernetes?",
+    "ground_truth": "Delete the pod with kubectl delete pod <name> -n <namespace>. The ReplicaSet will automatically create a replacement pod.",
+    "domain": "tech",
+    "category": "kubectl_operations",
+    "source_doc_id": "CONF-2001"
+  },
+  {
+    "question": "What causes CrashLoopBackOff in Kubernetes?",
+    "ground_truth": "CrashLoopBackOff occurs when a container repeatedly fails to start. Common causes: application error, missing config/secret, OOMKill, or incorrect command in the container spec.",
+    "domain": "tech",
+    "category": "kubernetes",
+    "source_doc_id": "CONF-2002"
+  },
+  {
+    "question": "How do I scale a Kubernetes deployment?",
+    "ground_truth": "Use kubectl scale deployment <name> --replicas=<n> or update the replicas field in the Deployment manifest and apply with kubectl apply -f.",
+    "domain": "tech",
+    "category": "kubectl_operations",
+    "source_doc_id": "CONF-2003"
+  },
+  {
+    "question": "What is a PodDisruptionBudget and when should I use it?",
+    "ground_truth": "A PodDisruptionBudget limits voluntary disruptions to pods. Use it to ensure minimum availability during node drains or rolling updates by specifying minAvailable or maxUnavailable.",
+    "domain": "tech",
+    "category": "kubernetes",
+    "source_doc_id": "CONF-2004"
+  },
+  {
+    "question": "How do I check RDS connection pool usage?",
+    "ground_truth": "Query CloudWatch metric DatabaseConnections for your RDS instance. Alert threshold is 80% of max_connections parameter. Connection pool exhaustion causes application timeouts.",
+    "domain": "tech",
+    "category": "rds",
+    "source_doc_id": "CONF-2005"
+  },
+  {
+    "question": "What is the EKS node instance type for worker nodes?",
+    "ground_truth": "Worker nodes run on c5.4xlarge instances (16 vCPU, 32GB RAM). The H100 GPU instance (p4d family) is dedicated to vLLM inference only.",
+    "domain": "tech",
+    "category": "infrastructure",
+    "source_doc_id": "CONF-2006"
+  },
+  {
+    "question": "How does the Planner-Executor-Critic workflow work?",
+    "ground_truth": "The PEC workflow: Planner creates an investigation plan, Executor runs each step calling tools (CloudWatch, Jira, kubectl), Critic validates completeness and triggers replan if gaps found. Max 2 replans.",
+    "domain": "tech",
+    "category": "llm_platform",
+    "source_doc_id": "CONF-2007"
+  },
+  {
+    "question": "What monitoring dashboards are available?",
+    "ground_truth": "Three Grafana dashboards: Data Health (DVC commits, embedding drift, QA coverage), MLflow Metrics (RAGAS scores, latency trends, Katib HPO), and Platform Performance (throughput, workflow routing, tool calls).",
+    "domain": "tech",
+    "category": "monitoring",
+    "source_doc_id": "CONF-2008"
+  },
+  {
+    "question": "How do I trigger the P09 RAGAS evaluation pipeline?",
+    "ground_truth": "P09 triggers automatically post-staging deployment and weekly on Monday 03:00 UTC. Manual trigger via Kubeflow UI or run_pipelines.ps1 -Pipeline p09 -QaLimit 50.",
+    "domain": "tech",
+    "category": "mlops",
+    "source_doc_id": "CONF-2009"
+  },
+  {
+    "question": "What is the hallucination rate target for the LLM platform?",
+    "ground_truth": "Target hallucination rate is below 2% (0.02). Measured by RAGAS as 1 - faithfulness. Hard block at 0.15 in the P09 deployment gate.",
+    "domain": "tech",
+    "category": "llm_platform",
+    "source_doc_id": "CONF-2010"
+  },
+  {
+    "question": "How is the vLLM server configured?",
+    "ground_truth": "vLLM serves Llama 2 7B GPTQ on an H100 (80GB HBM) using PagedAttention and continuous batching. Target throughput is 80+ tokens/second. OpenAI-compatible /v1/chat/completions endpoint.",
+    "domain": "tech",
+    "category": "infrastructure",
+    "source_doc_id": "CONF-2011"
+  },
+  {
+    "question": "What is the DVC remote storage location?",
+    "ground_truth": "DVC remote is S3 bucket llm-platform-dvc-remote in us-east-1 with Intelligent-Tiering lifecycle policy. Configure with: dvc remote add -d s3remote s3://llm-platform-dvc-remote.",
+    "domain": "tech",
+    "category": "mlops",
+    "source_doc_id": "CONF-2012"
+  },
+  {
+    "question": "How do I check if a Kubernetes node is under memory pressure?",
+    "ground_truth": "Run kubectl describe node <name> and look for MemoryPressure condition. Also check kubectl top nodes for memory utilization. Nodes under pressure trigger pod evictions.",
+    "domain": "tech",
+    "category": "kubectl_operations",
+    "source_doc_id": "CONF-2013"
+  },
+  {
+    "question": "What Qdrant collections exist in the platform?",
+    "ground_truth": "Three collections: tech_docs (infrastructure runbooks, incident history), hr_policies (leave, benefits, code of conduct), org_info (team structures, contacts, processes). All use 384-dimensional cosine vectors.",
+    "domain": "tech",
+    "category": "llm_platform",
+    "source_doc_id": "CONF-2014"
+  },
+  {
+    "question": "How is data versioned in the LLM platform?",
+    "ground_truth": "DVC 3.x tracks all datasets, golden QA pairs, and model checkpoints with SHA-based content addressing backed by S3. Every data change is committed to Git as a .dvc pointer file.",
+    "domain": "tech",
+    "category": "mlops",
+    "source_doc_id": "CONF-2015"
+  },
+  {
+    "question": "What triggers the automated retraining pipeline P11?",
+    "ground_truth": "P11 is triggered by: Evidently AI drift alert (JS-divergence > 0.15 or 10% faithfulness drop), P09 RAGAS gate failure, or manual trigger. Runs Katib HPO then RAGAS evaluation before promoting to Staging.",
+    "domain": "tech",
+    "category": "mlops",
+    "source_doc_id": "CONF-2016"
+  },
+  {
+    "question": "What is the rate limit for the LLM platform API?",
+    "ground_truth": "50 requests per minute per client IP. Enforced by Redis sliding window rate limiter. Exceeding the limit returns HTTP 429. Rate limit counters reset automatically after the 60-second window.",
+    "domain": "tech",
+    "category": "llm_platform",
+    "source_doc_id": "CONF-2017"
+  },
+  {
+    "question": "How do I check CloudWatch logs for the payment service?",
+    "ground_truth": "Use CloudWatch Logs Insights on log group /aws/eks/llm-platform/application with filter: fields @timestamp, @message | filter @message like /payment/ | sort @timestamp desc | limit 20",
+    "domain": "tech",
+    "category": "cloudwatch",
+    "source_doc_id": "CONF-2018"
+  },
+  {
+    "question": "What is the MLflow experiment for RAGAS results?",
+    "ground_truth": "RAGAS results are logged to MLflow experiment ragas-evaluation with runs tagged pipeline=P09-RAGAS. Metrics: faithfulness, answer_relevancy, context_precision, context_recall, answer_correctness, hallucination_rate.",
+    "domain": "tech",
+    "category": "mlops",
+    "source_doc_id": "CONF-2019"
+  }
+]

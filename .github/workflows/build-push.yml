@@ -1,0 +1,62 @@
+name: Build and Push to ECR
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Image to build (api/agents/all)
+        default: all
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        image: [api, agents]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-ecr
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push ${{ matrix.image }}
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          REPO=${{ env.ECR_REGISTRY }}/llm-platform/${{ matrix.image }}
+          docker build -t $REPO:$IMAGE_TAG -t $REPO:latest \
+            -f docker/${{ matrix.image }}/Dockerfile .
+          docker push $REPO:$IMAGE_TAG
+          docker push $REPO:latest
+          echo "IMAGE=$REPO:$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Trivy security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          exit-code: 1
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif

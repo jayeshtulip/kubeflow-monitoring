@@ -1,0 +1,83 @@
+# Default values — override in values-prod.yaml or values-staging.yaml
+
+replicaCount:
+  api:    2
+  agents: 2
+
+image:
+  registry: ""          # e.g. 123456789012.dkr.ecr.us-east-1.amazonaws.com
+  api:
+    repository: llm-platform/api
+    tag: latest
+    pullPolicy: IfNotPresent
+  agents:
+    repository: llm-platform/agents
+    tag: latest
+    pullPolicy: IfNotPresent
+
+service:
+  api:
+    type: ClusterIP
+    port: 8000
+  agents:
+    type: ClusterIP
+    port: 8001
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+  host: api.llm-platform.internal
+  tls: []
+
+resources:
+  api:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  agents:
+    requests:
+      cpu: "1"
+      memory: "2Gi"
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+
+autoscaling:
+  enabled: true
+  api:
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+  agents:
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+env:
+  QDRANT_HOST: "qdrant-service.llm-platform-prod.svc.cluster.local"
+  QDRANT_PORT: "6333"
+  OLLAMA_BASE_URL: "http://ollama-service.llm-platform-prod.svc.cluster.local:11434"
+  VLLM_API_BASE: "http://vllm-service.llm-platform-prod.svc.cluster.local:8080/v1"
+  MLFLOW_TRACKING_URI: "http://mlflow-service.mlflow.svc.cluster.local:5000"
+  REDIS_HOST: ""       # injected from External Secrets
+  POSTGRES_HOST: ""    # injected from External Secrets
+  EMBEDDING_MODEL: "all-MiniLM-L6-v2"
+  LANGCHAIN_TRACING_V2: "true"
+
+externalSecrets:
+  enabled: true
+  refreshInterval: "1h"
+  secretStoreRef:
+    name: aws-secretsmanager
+    kind: ClusterSecretStore
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,6 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: ml-pipeline-api-server
+          image: gcr.io/ml-pipeline/api-server:2.0.5

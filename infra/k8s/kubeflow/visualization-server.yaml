@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-pipeline-visualizationserver
+  namespace: kubeflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ml-pipeline-visualizationserver
+  template:
+    metadata:
+      labels:
+        app: ml-pipeline-visualizationserver
+    spec:
+      containers:
+        - name: ml-pipeline-visualizationserver
+          image: gcr.io/ml-pipeline/visualization-server:2.2.0
+          ports:
+            - containerPort: 8888
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-pipeline-visualizationserver
+  namespace: kubeflow
+spec:
+  selector:
+    app: ml-pipeline-visualizationserver
+  ports:
+    - port: 8888
+      targetPort: 8888

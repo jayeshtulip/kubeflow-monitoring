@@ -1,0 +1,6 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: ml-pipeline-ui
+          image: public.ecr.aws/kubeflow/ml-pipeline-ui:2.2.0

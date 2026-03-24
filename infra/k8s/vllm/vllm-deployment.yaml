@@ -1,0 +1,89 @@
+# vLLM on g4dn.2xlarge (T4 16GB)
+# Model: Mistral-7B-Instruct-v0.2 GPTQ 4-bit (~4GB VRAM)
+# Replaces Llama-2-7B from the plan (same capability, fits T4)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-server
+  namespace: llm-platform-prod
+  labels:
+    app: vllm-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm-server
+  template:
+    metadata:
+      labels:
+        app: vllm-server
+        model-backend: vllm
+    spec:
+      nodeSelector:
+        role: gpu
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:v0.4.3
+          args:
+            - --model
+            - TheBloke/Mistral-7B-Instruct-v0.2-GPTQ
+            - --quantization
+            - gptq
+            - --max-model-len
+            - "8192"
+            - --gpu-memory-utilization
+            - "0.80"
+            - --host
+            - "0.0.0.0"
+            - --port
+            - "8000"
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: llm-platform-secrets
+                  key: hf-token
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+              cpu: "6"
+              memory: "14Gi"
+            requests:
+              nvidia.com/gpu: "1"
+              cpu: "4"
+              memory: "10Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 180
+            periodSeconds: 30
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-service
+  namespace: llm-platform-prod
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http
+  selector:
+    app: vllm-server

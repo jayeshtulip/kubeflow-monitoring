@@ -1,0 +1,61 @@
+name: Nightly — P09 RAGAS + P04 Health + P07 Hallucination
+
+on:
+  schedule:
+    - cron: "0 3 * * 1-5"   # Mon-Fri 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  ragas-evaluation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-kubeflow
+          aws-region: us-east-1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt kfp==2.4.0
+      - name: Submit P09 RAGAS evaluation
+        run: |
+          python scripts/mlops/run_pipelines.ps1 -Pipeline p09 -QaLimit 200 || \
+          python -c "
+          from kfp.client import Client
+          client = Client(host='${{ secrets.KUBEFLOW_HOST }}')
+          run = client.create_run_from_pipeline_func(
+              __import__('importlib').import_module(
+                  'pipelines.p09_ragas_evaluation.pipeline'
+              ).ragas_evaluation_pipeline,
+              arguments={},
+              run_name='nightly-p09'
+          )
+          print('P09 submitted:', run.run_id)
+          "
+        env:
+          KUBEFLOW_HOST: ${{ secrets.KUBEFLOW_HOST }}
+
+  hallucination-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: ragas-evaluation
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt pytest pytest-timeout
+      - name: L4 performance tests
+        run: pytest tests/l4_performance/test_vllm_throughput.py -m l4 -v --timeout=120
+        env:
+          VLLM_API_BASE: ${{ secrets.VLLM_API_BASE }}

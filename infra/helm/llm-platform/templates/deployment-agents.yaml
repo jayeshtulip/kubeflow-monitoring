@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-agents
+  labels:
+    app: llm-platform-agents
+spec:
+  replicas: {{ .Values.replicaCount.agents }}
+  selector:
+    matchLabels:
+      app: llm-platform-agents
+  template:
+    metadata:
+      labels:
+        app: llm-platform-agents
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+    spec:
+      serviceAccountName: llm-platform-agents
+      containers:
+        - name: agents
+          image: {{ .Values.image.registry }}/{{ .Values.image.agents.repository }}:{{ .Values.image.agents.tag }}
+          imagePullPolicy: {{ .Values.image.agents.pullPolicy }}
+          ports:
+            - containerPort: 8001
+              name: http
+          env:
+            {{- range $key, $val := .Values.env }}
+            - name: {{ $key }}
+              value: {{ $val | quote }}
+            {{- end }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: llm-platform-secrets
+                  key: postgres-password
+            - name: LANGSMITH_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: llm-platform-secrets
+                  key: langsmith-api-key
+          resources:
+            {{- toYaml .Values.resources.agents | nindent 12 }}

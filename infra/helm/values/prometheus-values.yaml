@@ -1,0 +1,73 @@
+# kube-prometheus-stack values for LLM Platform
+# Plan: Section 5 — Prometheus + Grafana + kube-state-metrics
+
+grafana:
+  enabled: true
+  adminPassword: "LLMPlatform2026!"
+  persistence:
+    enabled: true
+    size: 5Gi
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+    datasources:
+      enabled: true
+  additionalDataSources:
+    - name: MLflow-JSON
+      type: simpod-json-datasource
+      url: http://mlflow-service.mlflow.svc.cluster.local:5000
+      access: proxy
+
+prometheus:
+  prometheusSpec:
+    retention: 30d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+    # Scrape our custom exporters
+    additionalScrapeConfigs:
+      - job_name: llm-platform-api
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [llm-platform-prod]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+      - job_name: dvc-exporter
+        static_configs:
+          - targets: ["dvc-exporter.llm-platform-prod.svc.cluster.local:9101"]
+      - job_name: qdrant
+        static_configs:
+          - targets: ["qdrant.llm-platform-prod.svc.cluster.local:6333"]
+        metrics_path: /metrics
+
+alertmanager:
+  enabled: true
+  config:
+    route:
+      group_by: [alertname]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 1h
+      receiver: slack-notifications
+    receivers:
+      - name: slack-notifications
+        slack_configs:
+          - api_url: "$env:SLACK_WEBHOOK_URL"
+            channel: "#llm-platform-alerts"
+            title: "LLM Platform Alert"
+            text: "{ range .Alerts }{ .Annotations.description }{ end }"
+
+kubeStateMetrics:
+  enabled: true
+
+nodeExporter:
+  enabled: true

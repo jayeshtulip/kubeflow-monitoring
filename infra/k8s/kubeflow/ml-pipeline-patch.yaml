@@ -1,0 +1,36 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: ml-pipeline-api-server
+          env:
+            - name: ML_PIPELINE_VISUALIZATIONSERVER_SERVICE_HOST
+              value: ml-pipeline-visualizationserver
+            - name: ML_PIPELINE_VISUALIZATIONSERVER_SERVICE_PORT
+              value: "8888"
+            - name: OBJECTSTORECONFIG_HOST
+              value: minio-service
+            - name: OBJECTSTORECONFIG_PORT
+              value: "9000"
+            - name: OBJECTSTORECONFIG_ACCESSKEY
+              value: minio
+            - name: OBJECTSTORECONFIG_SECRETACCESSKEY
+              value: minio123
+            - name: OBJECTSTORECONFIG_BUCKETNAME
+              value: mlpipeline
+            - name: OBJECTSTORECONFIG_SECURE
+              value: "false"
+            - name: DBCONFIG_MYSQLCONFIG_USER
+              value: root
+            - name: DBCONFIG_MYSQLCONFIG_PASSWORD
+              value: ""
+            - name: DBCONFIG_MYSQLCONFIG_DBNAME
+              value: mlpipeline
+            - name: DBCONFIG_MYSQLCONFIG_HOST
+              value: mysql
+            - name: DBCONFIG_MYSQLCONFIG_PORT
+              value: "3306"
+            - name: METADATA_GRPC_SERVICE_SERVICE_HOST
+              value: metadata-grpc-service
+            - name: METADATA_GRPC_SERVICE_SERVICE_PORT
+              value: "8080"

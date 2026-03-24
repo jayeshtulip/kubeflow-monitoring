@@ -1,0 +1,22 @@
+﻿# Katib HP search: chunk_size x overlap x top_k
+apiVersion: kubeflow.org/v1beta1
+kind: Experiment
+metadata:
+  name: rag-chunking-hpo
+spec:
+  objective:
+    type: maximize
+    goal: 0.85
+    objectiveMetricName: ragas_faithfulness
+  algorithm:
+    algorithmName: bayesianoptimization
+  parameters:
+    - name: chunk_size
+      parameterType: int
+      feasibleSpace: { min: "50", max: "200" }
+    - name: overlap
+      parameterType: int
+      feasibleSpace: { min: "10", max: "50" }
+    - name: top_k
+      parameterType: int
+      feasibleSpace: { min: "3", max: "10" }

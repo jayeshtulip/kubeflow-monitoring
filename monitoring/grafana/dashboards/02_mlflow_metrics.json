@@ -1,0 +1,154 @@
+{
+  "title": "MLflow Metrics \u2014 RAGAS + Latency + Katib",
+  "uid": "mlflow-metrics-v1",
+  "tags": [
+    "llm-platform",
+    "mlflow",
+    "ragas"
+  ],
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "refresh": "15m",
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "RAGAS Faithfulness (30-day trend)",
+      "targets": [
+        {
+          "expr": "llm_ragas_faithfulness",
+          "legendFormat": "Faithfulness"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              {
+                "value": null,
+                "color": "red"
+              },
+              {
+                "value": 0.85,
+                "color": "yellow"
+              },
+              {
+                "value": 0.9,
+                "color": "green"
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Hallucination Rate (target < 2%)",
+      "targets": [
+        {
+          "expr": "llm_hallucination_rate",
+          "legendFormat": "Hallucination Rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 0.02,
+                "color": "yellow"
+              },
+              {
+                "value": 0.05,
+                "color": "red"
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Workflow Latency P95 (ms)",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(llm_request_duration_ms_bucket{workflow_type='simple'}[5m]))",
+          "legendFormat": "Simple"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(llm_request_duration_ms_bucket{workflow_type='react'}[5m]))",
+          "legendFormat": "ReAct"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(llm_request_duration_ms_bucket{workflow_type='planner_executor_critic'}[5m]))",
+          "legendFormat": "PEC"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Platform Health Score",
+      "targets": [
+        {
+          "expr": "llm_platform_health_score",
+          "legendFormat": "Health Score"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              {
+                "value": null,
+                "color": "red"
+              },
+              {
+                "value": 0.6,
+                "color": "yellow"
+              },
+              {
+                "value": 0.9,
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 16
+      }
+    }
+  ],
+  "schemaVersion": 38
+}

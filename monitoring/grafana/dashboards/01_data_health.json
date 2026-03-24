@@ -1,0 +1,145 @@
+{
+  "title": "Data Health \u2014 DVC + Qdrant + QA Coverage",
+  "uid": "data-health-v1",
+  "tags": [
+    "llm-platform",
+    "data",
+    "dvc"
+  ],
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "refresh": "5m",
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "DVC Last Commit Age (hours)",
+      "targets": [
+        {
+          "expr": "(time() - dvc_last_commit_timestamp_seconds) / 3600",
+          "legendFormat": "Hours since last commit"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 24,
+                "color": "yellow"
+              },
+              {
+                "value": 72,
+                "color": "red"
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Embedding Drift (JS-div)",
+      "targets": [
+        {
+          "expr": "embedding_drift_js_divergence",
+          "legendFormat": "JS Divergence"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 0.1,
+                "color": "yellow"
+              },
+              {
+                "value": 0.15,
+                "color": "red"
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      }
+    },
+    {
+      "id": 3,
+      "type": "bargauge",
+      "title": "Qdrant Vector Count by Collection",
+      "targets": [
+        {
+          "expr": "qdrant_collection_vector_count",
+          "legendFormat": "{{collection}}"
+        }
+      ],
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      }
+    },
+    {
+      "id": 4,
+      "type": "bargauge",
+      "title": "Golden QA Coverage by Domain",
+      "targets": [
+        {
+          "expr": "golden_qa_pair_count",
+          "legendFormat": "{{domain}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              {
+                "value": null,
+                "color": "red"
+              },
+              {
+                "value": 20,
+                "color": "yellow"
+              },
+              {
+                "value": 50,
+                "color": "green"
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      }
+    }
+  ],
+  "schemaVersion": 38
+}

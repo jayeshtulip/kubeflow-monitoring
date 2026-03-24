@@ -1,0 +1,34 @@
+# SLA Burn Rate Alerts — Multiwindow multi-burn-rate
+# Based on Google SRE Book approach for 99.5% monthly SLA
+groups:
+  - name: sla_burn_rate
+    rules:
+
+      - alert: SLABurnRateFast
+        expr: |
+          (
+            rate(llm_requests_total{status="error"}[1h])
+            / rate(llm_requests_total[1h])
+          ) > (14.4 * 0.005)
+        for: 2m
+        labels:
+          severity: critical
+          team: sre
+          page: "true"
+        annotations:
+          summary: "Fast SLA burn rate — exhausting monthly error budget at 14.4x"
+          details: "1h error rate {{ $value | humanizePercentage }}"
+
+      - alert: SLABurnRateSlow
+        expr: |
+          (
+            rate(llm_requests_total{status="error"}[6h])
+            / rate(llm_requests_total[6h])
+          ) > (6 * 0.005)
+        for: 15m
+        labels:
+          severity: warning
+          team: sre
+        annotations:
+          summary: "Slow SLA burn rate — exhausting monthly error budget at 6x"
+          details: "6h error rate {{ $value | humanizePercentage }}"

@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: llm-platform-prod
+  labels:
+    istio-injection: enabled
+    environment: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: llm-platform-staging
+  labels:
+    istio-injection: enabled
+    environment: staging
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlflow
+  labels:
+    app: mlflow
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    app: monitoring
