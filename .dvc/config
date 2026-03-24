@@ -1,0 +1,5 @@
+[core]
+    remote = s3remote
+['remote "s3remote"']
+    url = s3://llm-platform-dvc-remote-659071697671/dvc
+    region = us-east-1
