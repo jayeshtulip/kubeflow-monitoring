@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: llm-platform
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jayeshtulip/kubeflow-monitoring
+    targetRevision: HEAD
+    path: infra/k8s/llm-platform
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: llm-platform-prod
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

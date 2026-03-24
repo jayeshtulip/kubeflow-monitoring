@@ -1,0 +1,14 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlflow
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jayeshtulip/kubeflow-monitoring
+    targetRevision: HEAD
+    path: infra/k8s/mlflow
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mlflow
