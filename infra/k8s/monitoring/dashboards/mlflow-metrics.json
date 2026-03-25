@@ -1,0 +1,209 @@
+{
+  "dashboard": {
+    "title": "LLM Platform - MLflow Metrics Tracker",
+    "uid": "llm-platform-mlflow",
+    "tags": [
+      "llm-platform",
+      "mlflow"
+    ],
+    "timezone": "browser",
+    "refresh": "5m",
+    "panels": [
+      {
+        "id": 1,
+        "type": "stat",
+        "title": "Total MLflow Runs",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 0,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "count(kube_pod_info{namespace='mlflow'})",
+            "legendFormat": "MLflow Pods"
+          }
+        ],
+        "options": {
+          "colorMode": "background"
+        }
+      },
+      {
+        "id": 2,
+        "type": "stat",
+        "title": "MLflow Pod Status",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "kube_pod_status_phase{namespace='mlflow', phase='Running'}",
+            "legendFormat": "Running"
+          }
+        ],
+        "options": {
+          "colorMode": "background"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "green",
+                  "value": 1
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "type": "stat",
+        "title": "Kubeflow Pods Running",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 12,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "count(kube_pod_status_phase{namespace='kubeflow', phase='Running'})",
+            "legendFormat": "KFP Pods"
+          }
+        ],
+        "options": {
+          "colorMode": "background"
+        }
+      },
+      {
+        "id": 4,
+        "type": "stat",
+        "title": "LLM Platform Pods Running",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 18,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "count(kube_pod_status_phase{namespace='llm-platform-prod', phase='Running'})",
+            "legendFormat": "LLM Pods"
+          }
+        ],
+        "options": {
+          "colorMode": "background"
+        }
+      },
+      {
+        "id": 5,
+        "type": "timeseries",
+        "title": "MLflow Pod CPU Usage",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 4
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace='mlflow', container!=''}[5m]))",
+            "legendFormat": "MLflow CPU"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "cores"
+          }
+        }
+      },
+      {
+        "id": 6,
+        "type": "timeseries",
+        "title": "MLflow Pod Memory",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 4
+        },
+        "targets": [
+          {
+            "expr": "sum(container_memory_working_set_bytes{namespace='mlflow', container!=''})",
+            "legendFormat": "MLflow Memory"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "type": "timeseries",
+        "title": "Kubeflow Pipeline Pods CPU",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 12
+        },
+        "targets": [
+          {
+            "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace='kubeflow', container='main'}[5m]))",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "cores"
+          }
+        }
+      },
+      {
+        "id": 8,
+        "type": "timeseries",
+        "title": "LLM Gateway + Ollama Memory",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 12
+        },
+        "targets": [
+          {
+            "expr": "sum(container_memory_working_set_bytes{namespace='llm-platform-prod', pod=~'ollama.*', container!=''})",
+            "legendFormat": "Ollama"
+          },
+          {
+            "expr": "sum(container_memory_working_set_bytes{namespace='llm-platform-prod', pod=~'llm-gateway.*', container!=''})",
+            "legendFormat": "LLM Gateway"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes"
+          }
+        }
+      }
+    ],
+    "schemaVersion": 38,
+    "version": 1
+  },
+  "overwrite": true,
+  "folderId": 0
+}
