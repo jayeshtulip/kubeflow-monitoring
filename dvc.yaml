@@ -2,7 +2,7 @@
 stages:
   preprocess:
     cmd: >
-      python -m src.storage.qdrant.indexer
+      python -m src.storage.qdrant
         --mode preprocess
         --input-dir data/raw
         --output-dir data/processed
@@ -17,7 +17,7 @@ stages:
 
   embed:
     cmd: >
-      python -m src.storage.qdrant.indexer
+      python -m src.storage.qdrant
         --mode embed
         --input-dir data/processed
         --output-dir data/embeddings
@@ -32,7 +32,7 @@ stages:
 
   index:
     cmd: >
-      python -m src.storage.qdrant.indexer
+      python -m src.storage.qdrant
         --mode index
         --input-dir data/embeddings
         --params mlops/dvc/params/rag_params.yaml
@@ -44,7 +44,7 @@ stages:
 
   validate_golden_qa:
     cmd: >
-      python -m src.ragas_eval.dataset_builder
+      python -m src.ragas_eval
         --mode validate
         --data-dir data/golden_qa
         --output data/reports/coverage_report.json
@@ -58,7 +58,7 @@ stages:
 
   ragas_baseline:
     cmd: >
-      python -m src.ragas_eval.evaluator
+      python -m src.ragas_eval
         --mode baseline
         --golden-qa-dir data/golden_qa
         --output data/ragas_results/baseline.json
@@ -72,3 +72,4 @@ stages:
       - data/ragas_results/baseline.json:
           cache: false
     desc: "Run RAGAS baseline evaluation against golden QA dataset"
+
