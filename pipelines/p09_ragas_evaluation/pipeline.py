@@ -83,13 +83,15 @@ def ragas_evaluation_pipeline(
     postgres_db: str = "llm_platform",
     postgres_user: str = "llm_admin",
     postgres_password: str = "Llmplatform2026",
-    mlflow_tracking_uri: str = "http://172.20.232.117:80",
+    mlflow_tracking_uri: str = "http://172.20.172.203:5000",
     mlflow_experiment: str = "ragas-evaluation",
     run_name: str = "ragas-weekly",
     model_name: str = "llm-platform-rag-config",
     model_version: str = "latest",
     faithfulness_hard_block: float = 0.85,
     hallucination_hard_block: float = 0.15,
+    vllm_base_url: str = "http://vllm-service.llm-platform-prod.svc.cluster.local:8000",
+    vllm_model: str = "TheBloke/Mistral-7B-Instruct-v0.2-GPTQ",
     slack_webhook_url: str = "",
     kubeflow_p11_webhook_url: str = "",
 ) -> None:
@@ -122,6 +124,8 @@ def ragas_evaluation_pipeline(
         run_name=run_name,
         faithfulness_hard_block=faithfulness_hard_block,
         hallucination_hard_block=hallucination_hard_block,
+        vllm_base_url=vllm_base_url,
+        vllm_model=vllm_model,
     )
     ragas_task
 
@@ -170,6 +174,7 @@ if __name__ == "__main__":
         package_path="pipelines/p09_ragas_evaluation/pipeline.yaml",
     )
     print("Compiled to pipelines/p09_ragas_evaluation/pipeline.yaml")
+
 
 
 

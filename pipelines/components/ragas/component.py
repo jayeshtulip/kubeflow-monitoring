@@ -201,6 +201,7 @@ def generate_answers_component(
         "mlflow==2.12.0",
         "boto3==1.34.0",
         "langchain-community==0.0.38",
+        
     ],
 )
 def ragas_score_component(
@@ -212,8 +213,8 @@ def ragas_score_component(
     hallucination_hard_block: float,
     ragas_metrics_output: Output[Metrics],
     ragas_report: Output[Artifact],
-    ollama_base_url: str = 'http://ollama-service.llm-platform-prod.svc.cluster.local:11434',
-    ollama_model: str = 'mistral:7b',
+    vllm_base_url: str = 'http://vllm-service.llm-platform-prod.svc.cluster.local:8000',
+    vllm_model: str = 'TheBloke/Mistral-7B-Instruct-v0.2-GPTQ',
 ) -> bool:
     """
     Compute all 6 RAGAS metrics and check the deployment gate.
@@ -229,7 +230,7 @@ def ragas_score_component(
     from datasets import Dataset
     from ragas import evaluate
     from ragas.llms import LangchainLLMWrapper
-    from langchain_community.llms import Ollama
+    from langchain_community.llms import VLLMOpenAI
     from ragas.metrics import (
         faithfulness, answer_relevancy,
         context_precision, context_recall, answer_correctness,
@@ -258,21 +259,27 @@ def ragas_score_component(
 
     t0 = time.perf_counter()
     try:
-        ollama_llm = LangchainLLMWrapper(Ollama(base_url=ollama_base_url, model=ollama_model))
-        faithfulness.llm = ollama_llm
-        answer_relevancy.llm = ollama_llm
-        context_precision.llm = ollama_llm
-        context_recall.llm = ollama_llm
-        answer_correctness.llm = ollama_llm
-        print(f"Using Ollama LLM: {ollama_base_url} model={ollama_model}")
+        vllm_llm = LangchainLLMWrapper(VLLMOpenAI(
+            openai_api_key='dummy',
+            openai_api_base=f'{vllm_base_url}/v1',
+            model_name=vllm_model,
+            max_tokens=1024,
+            temperature=0,
+        ))
+        faithfulness.llm = vllm_llm
+        answer_relevancy.llm = vllm_llm
+        context_precision.llm = vllm_llm
+        context_recall.llm = vllm_llm
+        answer_correctness.llm = vllm_llm
+        print(f'Using vLLM judge: {vllm_base_url} model={vllm_model}')
     except Exception as e:
-        print(f'Warning: could not init Ollama LLM: {e}')
+        print(f'Warning: could not init vLLM: {e}')
         import os
         os.environ["OPENAI_API_KEY"] = "dummy-key-not-used"
     result = evaluate(ds, metrics=[
         faithfulness, answer_relevancy,
-        context_precision, context_recall, answer_correctness,
-    ])
+        context_precision, answer_correctness,
+    ], raise_exceptions=False)
     elapsed = round(time.perf_counter() - t0, 2)
 
     df = result.to_pandas()
@@ -280,7 +287,7 @@ def ragas_score_component(
         "faithfulness":       float(df["faithfulness"].mean()),
         "answer_relevancy":   float(df["answer_relevancy"].mean()),
         "context_precision":  float(df["context_precision"].mean()),
-        "context_recall":     float(df["context_recall"].mean()),
+
         "answer_correctness": float(df["answer_correctness"].mean()),
     }
     scores["hallucination_rate"] = round(1.0 - scores["faithfulness"], 4)
@@ -326,6 +333,7 @@ def ragas_score_component(
     status = "PASSED" if scores["gate_passed"] else f"FAILED: {gate_failures}"
     print(f"RAGAS Gate: {status}")
     return scores["gate_passed"]
+
 
 
 

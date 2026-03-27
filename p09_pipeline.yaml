@@ -1,33 +1,3 @@
-# PIPELINE DEFINITION
-# Name: p09-ragas-evaluation
-# Description: RAGAS evaluation: retrieve -> generate -> score -> gate -> promote/block
-# Inputs:
-#    collection_names: str [Default: '["tech_docs","hr_policies","org_info"]']
-#    domain_filter: str [Default: '']
-#    embedding_model: str [Default: 'all-MiniLM-L6-v2']
-#    faithfulness_hard_block: float [Default: 0.85]
-#    hallucination_hard_block: float [Default: 0.15]
-#    kubeflow_p11_webhook_url: str [Default: '']
-#    max_tokens: int [Default: 512.0]
-#    min_pairs_per_domain: int [Default: 20.0]
-#    mlflow_experiment: str [Default: 'ragas-evaluation']
-#    mlflow_tracking_uri: str [Default: 'http://172.20.232.117:80']
-#    model_name: str [Default: 'llm-platform-rag-config']
-#    model_version: str [Default: 'latest']
-#    ollama_base_url: str [Default: 'http://ollama-service.llm-platform-prod.svc.cluster.local:11434']
-#    ollama_model: str [Default: 'mistral:7b']
-#    postgres_db: str [Default: 'llm_platform']
-#    postgres_host: str [Default: 'llm-platform-prod-postgres.c2xig0uywkrb.us-east-1.rds.amazonaws.com']
-#    postgres_password: str [Default: 'Llmplatform2026']
-#    postgres_user: str [Default: 'llm_admin']
-#    qa_limit: int [Default: 200.0]
-#    qdrant_host: str [Default: 'qdrant-service.llm-platform-prod.svc.cluster.local']
-#    qdrant_port: int [Default: 6333.0]
-#    run_name: str [Default: 'ragas-weekly']
-#    slack_webhook_url: str [Default: '']
-#    top_k: int [Default: 5.0]
-# Outputs:
-#    ragas-score-component-ragas_metrics_output: system.Metrics
 components:
   comp-block-deployment-component:
     executorLabel: exec-block-deployment-component
@@ -282,15 +252,15 @@ components:
           parameterType: STRING
         mlflow_tracking_uri:
           parameterType: STRING
-        ollama_base_url:
-          defaultValue: http://ollama-service.llm-platform-prod.svc.cluster.local:11434
-          isOptional: true
-          parameterType: STRING
-        ollama_model:
-          defaultValue: mistral:7b
-          isOptional: true
-          parameterType: STRING
         run_name:
+          parameterType: STRING
+        vllm_base_url:
+          defaultValue: http://vllm-service.llm-platform-prod.svc.cluster.local:8000
+          isOptional: true
+          parameterType: STRING
+        vllm_model:
+          defaultValue: TheBloke/Mistral-7B-Instruct-v0.2-GPTQ
+          isOptional: true
           parameterType: STRING
     outputDefinitions:
       artifacts:
@@ -631,15 +601,15 @@ deploymentSpec:
           \    mlflow_tracking_uri: str,\n    mlflow_experiment: str,\n    run_name:\
           \ str,\n    faithfulness_hard_block: float,\n    hallucination_hard_block:\
           \ float,\n    ragas_metrics_output: Output[Metrics],\n    ragas_report:\
-          \ Output[Artifact],\n    ollama_base_url: str = 'http://ollama-service.llm-platform-prod.svc.cluster.local:11434',\n\
-          \    ollama_model: str = 'mistral:7b',\n) -> bool:\n    \"\"\"\n    Compute\
-          \ all 6 RAGAS metrics and check the deployment gate.\n\n    Returns True\
-          \ (gate PASSED \u2014 allow deployment to staging) or\n            False\
-          \ (gate FAILED \u2014 block deployment, trigger P11 retraining).\n    \"\
-          \"\"\n    import json\n    import time\n    import os\n    os.environ[\"\
+          \ Output[Artifact],\n    vllm_base_url: str = 'http://vllm-service.llm-platform-prod.svc.cluster.local:8000',\n\
+          \    vllm_model: str = 'TheBloke/Mistral-7B-Instruct-v0.2-GPTQ',\n) -> bool:\n\
+          \    \"\"\"\n    Compute all 6 RAGAS metrics and check the deployment gate.\n\
+          \n    Returns True (gate PASSED \u2014 allow deployment to staging) or\n\
+          \            False (gate FAILED \u2014 block deployment, trigger P11 retraining).\n\
+          \    \"\"\"\n    import json\n    import time\n    import os\n    os.environ[\"\
           OPENAI_API_KEY\"] = \"dummy-not-used\"\n    import mlflow\n    from datasets\
           \ import Dataset\n    from ragas import evaluate\n    from ragas.llms import\
-          \ LangchainLLMWrapper\n    from langchain_community.llms import Ollama\n\
+          \ LangchainLLMWrapper\n    from langchain_community.llms import VLLMOpenAI\n\
           \    from ragas.metrics import (\n        faithfulness, answer_relevancy,\n\
           \        context_precision, context_recall, answer_correctness,\n    )\n\
           \n    rows = []\n    with open(answered_dataset.path) as f:\n        for\
@@ -653,36 +623,37 @@ deploymentSpec:
           \     \"question\":     Value(\"string\"),\n        \"answer\":       Value(\"\
           string\"),\n        \"contexts\":     Sequence(Value(\"string\")),\n   \
           \     \"ground_truth\": Value(\"string\"),\n    }))\n\n    t0 = time.perf_counter()\n\
-          \    try:\n        ollama_llm = LangchainLLMWrapper(Ollama(base_url=ollama_base_url,\
-          \ model=ollama_model))\n        faithfulness.llm = ollama_llm\n        answer_relevancy.llm\
-          \ = ollama_llm\n        context_precision.llm = ollama_llm\n        context_recall.llm\
-          \ = ollama_llm\n        answer_correctness.llm = ollama_llm\n        print(f\"\
-          Using Ollama LLM: {ollama_base_url} model={ollama_model}\")\n    except\
-          \ Exception as e:\n        print(f'Warning: could not init Ollama LLM: {e}')\n\
-          \        import os\n        os.environ[\"OPENAI_API_KEY\"] = \"dummy-key-not-used\"\
-          \n    result = evaluate(ds, metrics=[\n        faithfulness, answer_relevancy,\n\
-          \        context_precision, context_recall, answer_correctness,\n    ])\n\
-          \    elapsed = round(time.perf_counter() - t0, 2)\n\n    df = result.to_pandas()\n\
-          \    scores = {\n        \"faithfulness\":       float(df[\"faithfulness\"\
-          ].mean()),\n        \"answer_relevancy\":   float(df[\"answer_relevancy\"\
-          ].mean()),\n        \"context_precision\":  float(df[\"context_precision\"\
-          ].mean()),\n        \"context_recall\":     float(df[\"context_recall\"\
-          ].mean()),\n        \"answer_correctness\": float(df[\"answer_correctness\"\
-          ].mean()),\n    }\n    scores[\"hallucination_rate\"] = round(1.0 - scores[\"\
-          faithfulness\"], 4)\n    scores[\"sample_count\"]  = len(rows)\n    scores[\"\
-          eval_seconds\"]  = elapsed\n\n    # Gate check\n    gate_failures = []\n\
-          \    if scores[\"faithfulness\"] < faithfulness_hard_block:\n        gate_failures.append(\n\
-          \            f\"faithfulness={scores['faithfulness']:.3f} < {faithfulness_hard_block}\"\
-          \n        )\n    if scores[\"hallucination_rate\"] > hallucination_hard_block:\n\
-          \        gate_failures.append(\n            f\"hallucination_rate={scores['hallucination_rate']:.3f}\
-          \ > {hallucination_hard_block}\"\n        )\n\n    scores[\"gate_passed\"\
-          ]    = len(gate_failures) == 0\n    scores[\"gate_failures\"]  = gate_failures\n\
-          \n    # Log to MLflow\n    mlflow.set_tracking_uri(mlflow_tracking_uri)\n\
-          \    mlflow.set_experiment(mlflow_experiment)\n    with mlflow.start_run(run_name=run_name)\
-          \ as run:\n        mlflow.log_metrics({k: v for k, v in scores.items() if\
-          \ isinstance(v, float)})\n        mlflow.log_param(\"sample_count\", len(rows))\n\
-          \        mlflow.set_tags({\n            \"gate_passed\":  str(scores[\"\
-          gate_passed\"]),\n            \"gate_failures\": \"|\".join(gate_failures)\
+          \    try:\n        vllm_llm = LangchainLLMWrapper(VLLMOpenAI(\n        \
+          \    openai_api_key='dummy',\n            openai_api_base=f'{vllm_base_url}/v1',\n\
+          \            model_name=vllm_model,\n            max_tokens=1024,\n    \
+          \        temperature=0,\n        ))\n        faithfulness.llm = vllm_llm\n\
+          \        answer_relevancy.llm = vllm_llm\n        context_precision.llm\
+          \ = vllm_llm\n        context_recall.llm = vllm_llm\n        answer_correctness.llm\
+          \ = vllm_llm\n        print(f'Using vLLM judge: {vllm_base_url} model={vllm_model}')\n\
+          \    except Exception as e:\n        print(f'Warning: could not init vLLM:\
+          \ {e}')\n        import os\n        os.environ[\"OPENAI_API_KEY\"] = \"\
+          dummy-key-not-used\"\n    result = evaluate(ds, metrics=[\n        faithfulness,\
+          \ answer_relevancy,\n        context_precision, answer_correctness,\n  \
+          \  ], raise_exceptions=False)\n    elapsed = round(time.perf_counter() -\
+          \ t0, 2)\n\n    df = result.to_pandas()\n    scores = {\n        \"faithfulness\"\
+          :       float(df[\"faithfulness\"].mean()),\n        \"answer_relevancy\"\
+          :   float(df[\"answer_relevancy\"].mean()),\n        \"context_precision\"\
+          :  float(df[\"context_precision\"].mean()),\n\n        \"answer_correctness\"\
+          : float(df[\"answer_correctness\"].mean()),\n    }\n    scores[\"hallucination_rate\"\
+          ] = round(1.0 - scores[\"faithfulness\"], 4)\n    scores[\"sample_count\"\
+          ]  = len(rows)\n    scores[\"eval_seconds\"]  = elapsed\n\n    # Gate check\n\
+          \    gate_failures = []\n    if scores[\"faithfulness\"] < faithfulness_hard_block:\n\
+          \        gate_failures.append(\n            f\"faithfulness={scores['faithfulness']:.3f}\
+          \ < {faithfulness_hard_block}\"\n        )\n    if scores[\"hallucination_rate\"\
+          ] > hallucination_hard_block:\n        gate_failures.append(\n         \
+          \   f\"hallucination_rate={scores['hallucination_rate']:.3f} > {hallucination_hard_block}\"\
+          \n        )\n\n    scores[\"gate_passed\"]    = len(gate_failures) == 0\n\
+          \    scores[\"gate_failures\"]  = gate_failures\n\n    # Log to MLflow\n\
+          \    mlflow.set_tracking_uri(mlflow_tracking_uri)\n    mlflow.set_experiment(mlflow_experiment)\n\
+          \    with mlflow.start_run(run_name=run_name) as run:\n        mlflow.log_metrics({k:\
+          \ v for k, v in scores.items() if isinstance(v, float)})\n        mlflow.log_param(\"\
+          sample_count\", len(rows))\n        mlflow.set_tags({\n            \"gate_passed\"\
+          :  str(scores[\"gate_passed\"]),\n            \"gate_failures\": \"|\".join(gate_failures)\
           \ if gate_failures else \"none\",\n            \"pipeline\": \"P09-RAGAS\"\
           ,\n        })\n\n    # Write KFP Metrics\n    for k, v in scores.items():\n\
           \        if isinstance(v, (int, float)):\n            ragas_metrics_output.log_metric(k,\
@@ -792,6 +763,8 @@ root:
             producerSubtask: ragas-score-component
     tasks:
       condition-1:
+        cachingOptions:
+          enableCache: false
         componentRef:
           name: comp-condition-1
         dependentTasks:
@@ -821,6 +794,8 @@ root:
           condition: inputs.parameter_values['pipelinechannel--ragas-score-component-Output']
             == true
       condition-2:
+        cachingOptions:
+          enableCache: false
         componentRef:
           name: comp-condition-2
         dependentTasks:
@@ -851,7 +826,7 @@ root:
             == false
       generate-answers-component:
         cachingOptions:
-          enableCache: true
+          enableCache: false
         componentRef:
           name: comp-generate-answers-component
         dependentTasks:
@@ -873,7 +848,7 @@ root:
           name: generate-answers-component
       ragas-score-component:
         cachingOptions:
-          enableCache: true
+          enableCache: false
         componentRef:
           name: comp-ragas-score-component
         dependentTasks:
@@ -895,11 +870,15 @@ root:
               componentInputParameter: mlflow_tracking_uri
             run_name:
               componentInputParameter: run_name
+            vllm_base_url:
+              componentInputParameter: vllm_base_url
+            vllm_model:
+              componentInputParameter: vllm_model
         taskInfo:
           name: ragas-score-component
       retrieve-contexts-component:
         cachingOptions:
-          enableCache: true
+          enableCache: false
         componentRef:
           name: comp-retrieve-contexts-component
         inputs:
@@ -967,7 +946,7 @@ root:
         isOptional: true
         parameterType: STRING
       mlflow_tracking_uri:
-        defaultValue: http://172.20.232.117:80
+        defaultValue: http://172.20.172.203:5000
         isOptional: true
         parameterType: STRING
       model_name:
@@ -1026,6 +1005,14 @@ root:
         defaultValue: 5.0
         isOptional: true
         parameterType: NUMBER_INTEGER
+      vllm_base_url:
+        defaultValue: http://vllm-service.llm-platform-prod.svc.cluster.local:8000
+        isOptional: true
+        parameterType: STRING
+      vllm_model:
+        defaultValue: TheBloke/Mistral-7B-Instruct-v0.2-GPTQ
+        isOptional: true
+        parameterType: STRING
   outputDefinitions:
     artifacts:
       ragas-score-component-ragas_metrics_output:
