@@ -1,5 +1,5 @@
 """
-CLI wrapper for the Qdrant indexer — used by DVC pipeline stages.
+CLI wrapper for the Qdrant indexer ï¿½ used by DVC pipeline stages.
 
 Usage:
   python scripts/dvc/run_indexer.py --mode preprocess --input-dir data/raw --output-dir data/processed
