@@ -9,6 +9,7 @@
 #    postgres_password: str [Default: 'Llmplatform2026']
 #    postgres_user: str [Default: 'llm_admin']
 #    qdrant_host: str [Default: 'qdrant.llm-platform-prod.svc.cluster.local']
+#    run_uuid: str [Default: 'default']
 #    s3_remote: str [Default: 's3://llm-platform-dvc-remote-659071697671/dvc']
 #    stage: str [Default: 'all']
 components:
@@ -17,6 +18,8 @@ components:
     inputDefinitions:
       parameters:
         aws_region:
+          parameterType: STRING
+        run_uuid:
           parameterType: STRING
         s3_remote:
           parameterType: STRING
@@ -36,6 +39,8 @@ components:
         aws_region:
           parameterType: STRING
         mlflow_tracking_uri:
+          parameterType: STRING
+        run_uuid:
           parameterType: STRING
         s3_remote:
           parameterType: STRING
@@ -63,6 +68,8 @@ components:
         postgres_user:
           parameterType: STRING
         qdrant_host:
+          parameterType: STRING
+        run_uuid:
           parameterType: STRING
         s3_remote:
           parameterType: STRING
@@ -107,25 +114,26 @@ deploymentSpec:
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef dvc_pull_component(\n    s3_remote: str,\n    aws_region: str,\n\
-          \    pull_report: Output[Artifact],\n) -> int:\n    import subprocess, json,\
-          \ os\n    os.environ[\"AWS_DEFAULT_REGION\"] = aws_region\n\n    import\
-          \ subprocess as sp2, os, pathlib\n    sp2.run([\"apt-get\", \"update\",\
-          \ \"-q\"], capture_output=True)\n    sp2.run([\"apt-get\", \"install\",\
-          \ \"-y\", \"-q\", \"git\"], capture_output=True)\n    clone2 = sp2.run([\"\
-          git\", \"clone\", \"--depth\", \"1\",\n        \"https://github.com/jayeshtulip/kubeflow-monitoring.git\"\
-          ,\n        \"/workspace\"], capture_output=True, text=True)\n    print(\"\
-          Pull clone:\", clone2.returncode, clone2.stderr[-100:])\n    os.chdir(\"\
-          /workspace\")\n    # Configure DVC remote\n    subprocess.run([\"dvc\",\
-          \ \"remote\", \"add\", \"-d\", \"s3remote\", s3_remote, \"--force\"],\n\
-          \                   capture_output=True)\n    subprocess.run([\"dvc\", \"\
-          remote\", \"modify\", \"s3remote\", \"region\", aws_region],\n         \
-          \          capture_output=True)\n\n    result = subprocess.run([\"dvc\"\
-          , \"pull\", \"--force\"],\n                            capture_output=True,\
-          \ text=True)\n    print(result.stdout)\n    print(result.stderr)\n\n   \
-          \ report = {\"status\": \"success\" if result.returncode == 0 else \"failed\"\
-          ,\n              \"stdout\": result.stdout[-500:], \"returncode\": result.returncode}\n\
-          \    with open(pull_report.path, \"w\") as f:\n        json.dump(report,\
-          \ f)\n\n    return result.returncode\n\n"
+          \    run_uuid: str,\n    pull_report: Output[Artifact],\n) -> int:\n   \
+          \ import subprocess, json, os\n    os.environ[\"AWS_DEFAULT_REGION\"] =\
+          \ aws_region\n    print(f\"Run UUID: {run_uuid}\")\n\n    import subprocess\
+          \ as sp\n    sp.run([\"apt-get\", \"update\", \"-q\"], capture_output=True)\n\
+          \    sp.run([\"apt-get\", \"install\", \"-y\", \"-q\", \"git\"], capture_output=True)\n\
+          \    clone = sp.run([\"git\", \"clone\", \"--depth\", \"1\",\n        \"\
+          https://github.com/jayeshtulip/kubeflow-monitoring.git\",\n        \"/workspace\"\
+          ], capture_output=True, text=True)\n    print(\"Clone:\", clone.returncode,\
+          \ clone.stderr[-100:])\n    os.chdir(\"/workspace\")\n    subprocess.run([\"\
+          dvc\", \"remote\", \"add\", \"-d\", \"s3remote\", s3_remote, \"--force\"\
+          ], capture_output=True)\n    subprocess.run([\"dvc\", \"remote\", \"modify\"\
+          , \"s3remote\", \"region\", \"us-east-1\"], capture_output=True)\n    result\
+          \ = subprocess.run([\"dvc\", \"pull\", \"--force\"], capture_output=True,\
+          \ text=True)\n    print(\"DVC pull stdout:\", result.stdout[-300:])\n  \
+          \  print(\"DVC pull stderr:\", result.stderr[-300:])\n    print(\"DVC pull\
+          \ returncode:\", result.returncode)\n\n    report = {\"status\": \"success\"\
+          \ if result.returncode == 0 else \"failed\",\n              \"stdout\":\
+          \ result.stdout[-500:], \"returncode\": result.returncode,\n           \
+          \   \"run_uuid\": run_uuid}\n    with open(pull_report.path, \"w\") as f:\n\
+          \        json.dump(report, f)\n    return result.returncode\n\n"
         image: 659071697671.dkr.ecr.us-east-1.amazonaws.com/llm-platform/pipeline-base:latest
     exec-dvc-push-component:
       container:
@@ -155,23 +163,24 @@ deploymentSpec:
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef dvc_push_component(\n    s3_remote: str,\n    aws_region: str,\n\
-          \    mlflow_tracking_uri: str,\n    push_report: Output[Artifact],\n) ->\
-          \ str:\n    import subprocess, json, os, hashlib\n    os.environ[\"AWS_DEFAULT_REGION\"\
-          ] = aws_region\n\n    # Push artifacts to S3\n    result = subprocess.run([\"\
-          dvc\", \"push\"],\n                            capture_output=True, text=True)\n\
-          \    print(result.stdout)\n\n    # Get DVC SHA for lineage\n    sha_result\
-          \ = subprocess.run([\"dvc\", \"status\", \"--json\"],\n                \
-          \                capture_output=True, text=True)\n    dvc_sha = hashlib.md5(sha_result.stdout.encode()).hexdigest()[:8]\n\
-          \n    # Log to MLflow\n    try:\n        import mlflow\n        mlflow.set_tracking_uri(mlflow_tracking_uri)\n\
-          \        mlflow.set_experiment(\"dvc-pipeline\")\n        with mlflow.start_run(run_name=\"\
-          dvc-repro\"):\n            mlflow.log_param(\"dvc_sha\", dvc_sha)\n    \
-          \        mlflow.log_param(\"s3_remote\", s3_remote)\n            mlflow.set_tag(\"\
+          \    mlflow_tracking_uri: str,\n    run_uuid: str,\n    push_report: Output[Artifact],\n\
+          ) -> str:\n    import subprocess, json, os, hashlib\n    os.environ[\"AWS_DEFAULT_REGION\"\
+          ] = aws_region\n    print(f\"Run UUID: {run_uuid}\")\n\n    result = subprocess.run([\"\
+          dvc\", \"push\"], capture_output=True, text=True)\n    print(result.stdout)\n\
+          \n    sha_result = subprocess.run([\"dvc\", \"status\", \"--json\"], capture_output=True,\
+          \ text=True)\n    dvc_sha = hashlib.md5(sha_result.stdout.encode()).hexdigest()[:8]\n\
+          \n    try:\n        import mlflow\n        mlflow.set_tracking_uri(mlflow_tracking_uri)\n\
+          \        mlflow.set_experiment(\"dvc-pipeline\")\n        with mlflow.start_run(run_name=f\"\
+          dvc-repro-{run_uuid[:8]}\"):\n            mlflow.log_param(\"dvc_sha\",\
+          \ dvc_sha)\n            mlflow.log_param(\"s3_remote\", s3_remote)\n   \
+          \         mlflow.log_param(\"run_uuid\", run_uuid)\n            mlflow.set_tag(\"\
           pipeline\", \"P10-DVC\")\n        print(f\"Logged to MLflow: dvc_sha={dvc_sha}\"\
           )\n    except Exception as e:\n        print(f\"MLflow log failed (non-critical):\
           \ {e}\")\n\n    status = \"success\" if result.returncode == 0 else \"failed\"\
-          \n    report = {\"status\": status, \"dvc_sha\": dvc_sha, \"push_returncode\"\
-          : result.returncode}\n    with open(push_report.path, \"w\") as f:\n   \
-          \     json.dump(report, f)\n    return status\n\n"
+          \n    report = {\"status\": status, \"dvc_sha\": dvc_sha,\n            \
+          \  \"push_returncode\": result.returncode, \"run_uuid\": run_uuid}\n   \
+          \ with open(push_report.path, \"w\") as f:\n        json.dump(report, f)\n\
+          \    return status\n\n"
         image: 659071697671.dkr.ecr.us-east-1.amazonaws.com/llm-platform/pipeline-base:latest
     exec-dvc-repro-component:
       container:
@@ -203,39 +212,33 @@ deploymentSpec:
           \ *\n\ndef dvc_repro_component(\n    stage: str,\n    s3_remote: str,\n\
           \    aws_region: str,\n    qdrant_host: str,\n    postgres_host: str,\n\
           \    postgres_db: str,\n    postgres_user: str,\n    postgres_password:\
-          \ str,\n    repro_report: Output[Artifact],\n) -> str:\n    import subprocess,\
-          \ json, os\n    os.environ[\"AWS_DEFAULT_REGION\"] = aws_region\n    os.environ[\"\
-          QDRANT_HOST\"] = qdrant_host\n    os.environ[\"POSTGRES_HOST\"] = postgres_host\n\
-          \    os.environ[\"POSTGRES_DB\"] = postgres_db\n    os.environ[\"POSTGRES_USER\"\
-          ] = postgres_user\n    os.environ[\"POSTGRES_PASSWORD\"] = postgres_password\n\
-          \n    import subprocess as sp\n    sp.run([\"apt-get\", \"update\", \"-q\"\
-          ], capture_output=True)\n    git_inst = sp.run([\"apt-get\", \"install\"\
-          , \"-y\", \"-q\", \"git\"], capture_output=True, text=True)\n    print(\"\
-          git install:\", git_inst.returncode, git_inst.stderr[-100:])\n    clone\
-          \ = sp.run([\"git\", \"clone\", \"--depth\", \"1\",\n        \"https://github.com/jayeshtulip/kubeflow-monitoring.git\"\
-          ,\n        \"/workspace\"], capture_output=True, text=True)\n    print(\"\
-          Clone:\", clone.returncode, clone.stdout, clone.stderr)\n    os.chdir(\"\
-          /workspace\")\n    sp.run([\"dvc\", \"remote\", \"add\", \"-d\", \"s3remote\"\
-          , s3_remote, \"--force\"], capture_output=True)\n    sp.run([\"dvc\", \"\
-          remote\", \"modify\", \"s3remote\", \"region\", aws_region], capture_output=True)\n\
-          \    pull_result = sp.run([\"dvc\", \"pull\", \"--force\"], capture_output=True,\
-          \ text=True)\n    print(\"DVC pull stdout:\", pull_result.stdout[-300:])\n\
-          \    print(\"DVC pull stderr:\", pull_result.stderr[-300:])\n    print(\"\
-          DVC pull returncode:\", pull_result.returncode)\n    # Create data/raw if\
-          \ dvc pull did not restore it\n    import pathlib\n    if not pathlib.Path(\"\
-          /workspace/data/raw\").exists():\n        print(\"data/raw missing after\
-          \ dvc pull - pulling specific target\")\n        sp.run([\"dvc\", \"pull\"\
-          , \"data/raw\"], capture_output=True)\n        pathlib.Path(\"/workspace/data/raw\"\
-          ).mkdir(parents=True, exist_ok=True)\n    print(f\"Running: dvc repro {stage}\"\
-          )\n    if stage == \"all\":\n        result = subprocess.run([\"dvc\", \"\
-          repro\"],\n                                capture_output=True, text=True)\n\
-          \    else:\n        result = subprocess.run([\"dvc\", \"repro\", stage],\n\
-          \                                capture_output=True, text=True)\n\n   \
-          \ print(result.stdout[-1000:])\n    print(result.stderr[-500:])\n\n    status\
-          \ = \"success\" if result.returncode == 0 else \"failed\"\n    report =\
-          \ {\"stage\": stage, \"status\": status,\n              \"stdout\": result.stdout[-500:],\
-          \ \"returncode\": result.returncode}\n    with open(repro_report.path, \"\
-          w\") as f:\n        json.dump(report, f)\n    return status\n\n"
+          \ str,\n    run_uuid: str,\n    repro_report: Output[Artifact],\n) -> str:\n\
+          \    import subprocess, json, os, pathlib\n    os.environ[\"AWS_DEFAULT_REGION\"\
+          ] = aws_region\n    os.environ[\"QDRANT_HOST\"] = qdrant_host\n    os.environ[\"\
+          POSTGRES_HOST\"] = postgres_host\n    os.environ[\"POSTGRES_DB\"] = postgres_db\n\
+          \    os.environ[\"POSTGRES_USER\"] = postgres_user\n    os.environ[\"POSTGRES_PASSWORD\"\
+          ] = postgres_password\n    print(f\"Run UUID: {run_uuid}\")\n\n    import\
+          \ subprocess as sp\n    sp.run([\"apt-get\", \"update\", \"-q\"], capture_output=True)\n\
+          \    sp.run([\"apt-get\", \"install\", \"-y\", \"-q\", \"git\"], capture_output=True)\n\
+          \    clone = sp.run([\"git\", \"clone\", \"--depth\", \"1\",\n        \"\
+          https://github.com/jayeshtulip/kubeflow-monitoring.git\",\n        \"/workspace\"\
+          ], capture_output=True, text=True)\n    print(\"Clone:\", clone.returncode,\
+          \ clone.stderr[-50:])\n    os.chdir(\"/workspace\")\n    sp.run([\"dvc\"\
+          , \"remote\", \"add\", \"-d\", \"s3remote\", s3_remote, \"--force\"], capture_output=True)\n\
+          \    sp.run([\"dvc\", \"remote\", \"modify\", \"s3remote\", \"region\",\
+          \ \"us-east-1\"], capture_output=True)\n    pull = sp.run([\"dvc\", \"pull\"\
+          , \"--force\"], capture_output=True, text=True)\n    print(\"DVC pull:\"\
+          , pull.returncode, pull.stdout[-200:])\n\n    if not pathlib.Path(\"/workspace/data/raw\"\
+          ).exists():\n        pathlib.Path(\"/workspace/data/raw\").mkdir(parents=True,\
+          \ exist_ok=True)\n\n    print(f\"Running: dvc repro {stage}\")\n    if stage\
+          \ == \"all\":\n        result = subprocess.run([\"dvc\", \"repro\"], capture_output=True,\
+          \ text=True)\n    else:\n        result = subprocess.run([\"dvc\", \"repro\"\
+          , stage], capture_output=True, text=True)\n\n    print(result.stdout[-1000:])\n\
+          \    print(result.stderr[-500:])\n\n    status = \"success\" if result.returncode\
+          \ == 0 else \"failed\"\n    report = {\"stage\": stage, \"status\": status,\n\
+          \              \"stdout\": result.stdout[-500:], \"returncode\": result.returncode,\n\
+          \              \"run_uuid\": run_uuid}\n    with open(repro_report.path,\
+          \ \"w\") as f:\n        json.dump(report, f)\n    return status\n\n"
         image: 659071697671.dkr.ecr.us-east-1.amazonaws.com/llm-platform/pipeline-base:latest
 pipelineInfo:
   description: DVC repro inside EKS - preprocess, embed, index, validate, push to
@@ -245,21 +248,21 @@ root:
   dag:
     tasks:
       dvc-pull-component:
-        cachingOptions:
-          enableCache: true
+        cachingOptions: {}
         componentRef:
           name: comp-dvc-pull-component
         inputs:
           parameters:
             aws_region:
               componentInputParameter: aws_region
+            run_uuid:
+              componentInputParameter: run_uuid
             s3_remote:
               componentInputParameter: s3_remote
         taskInfo:
           name: dvc-pull-component
       dvc-push-component:
-        cachingOptions:
-          enableCache: true
+        cachingOptions: {}
         componentRef:
           name: comp-dvc-push-component
         dependentTasks:
@@ -270,13 +273,14 @@ root:
               componentInputParameter: aws_region
             mlflow_tracking_uri:
               componentInputParameter: mlflow_tracking_uri
+            run_uuid:
+              componentInputParameter: run_uuid
             s3_remote:
               componentInputParameter: s3_remote
         taskInfo:
           name: dvc-push-component
       dvc-repro-component:
-        cachingOptions:
-          enableCache: true
+        cachingOptions: {}
         componentRef:
           name: comp-dvc-repro-component
         dependentTasks:
@@ -295,6 +299,8 @@ root:
               componentInputParameter: postgres_user
             qdrant_host:
               componentInputParameter: qdrant_host
+            run_uuid:
+              componentInputParameter: run_uuid
             s3_remote:
               componentInputParameter: s3_remote
             stage:
@@ -329,6 +335,10 @@ root:
         parameterType: STRING
       qdrant_host:
         defaultValue: qdrant.llm-platform-prod.svc.cluster.local
+        isOptional: true
+        parameterType: STRING
+      run_uuid:
+        defaultValue: default
         isOptional: true
         parameterType: STRING
       s3_remote:
