@@ -34,7 +34,7 @@ jobs:
             --region us-east-1
 
       - name: Install dependencies
-        run: pip install requests kfp==2.2.0 --quiet
+        run: pip install requests --quiet
 
       - name: Port-forward KFP API (background)
         run: |
