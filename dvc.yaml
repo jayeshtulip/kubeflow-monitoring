@@ -1,12 +1,6 @@
 stages:
   preprocess:
-    cmd: >
-      python scripts/dvc/run_indexer.py
-        --mode preprocess
-        --input-dir data/raw
-        --output-dir data/processed
-        --chunk-size 50
-        --overlap 10
+    cmd: python scripts/dvc/run_indexer.py --mode preprocess --input-dir data/raw --output-dir data/processed --chunk-size 50 --overlap 10
     deps:
       - scripts/dvc/run_indexer.py
       - src/storage/qdrant/indexer.py
@@ -16,12 +10,7 @@ stages:
     desc: "Chunk raw documents into overlapping segments"
 
   embed:
-    cmd: >
-      python scripts/dvc/run_indexer.py
-        --mode embed
-        --input-dir data/processed
-        --output-dir data/embeddings
-        --model all-MiniLM-L6-v2
+    cmd: python scripts/dvc/run_indexer.py --mode embed --input-dir data/processed --output-dir data/embeddings --model all-MiniLM-L6-v2
     deps:
       - scripts/dvc/run_indexer.py
       - src/storage/qdrant/indexer.py
@@ -31,10 +20,7 @@ stages:
     desc: "Generate sentence-transformer embeddings for all chunks"
 
   index:
-    cmd: >
-      python scripts/dvc/run_indexer.py
-        --mode index
-        --input-dir data/embeddings
+    cmd: python scripts/dvc/run_indexer.py --mode index --input-dir data/embeddings
     deps:
       - scripts/dvc/run_indexer.py
       - src/storage/qdrant/indexer.py
