@@ -52,8 +52,9 @@ stages:
     desc: "Validate QA dataset coverage per domain from PostgreSQL"
 
   ragas_baseline:
-    cmd: python -c "print('ragas_baseline: runs via Kubeflow P09 pipeline with vLLM judge')"
+    cmd: python scripts/dvc/ragas_baseline_placeholder.py
     deps:
+      - scripts/dvc/ragas_baseline_placeholder.py
       - data/golden_qa
       - data/embeddings
     desc: "Placeholder - RAGAS evaluation runs via Kubeflow P09 pipeline"
