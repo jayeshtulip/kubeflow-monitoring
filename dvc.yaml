@@ -20,7 +20,7 @@ stages:
     desc: "Generate sentence-transformer embeddings for all chunks"
 
   index:
-    cmd: python scripts/dvc/run_indexer.py --mode index --input-dir data/embeddings
+    cmd: python scripts/dvc/run_indexer.py --mode index --input-dir data/embeddings --qdrant-host qdrant.llm-platform-prod.svc.cluster.local
     deps:
       - scripts/dvc/run_indexer.py
       - src/storage/qdrant/indexer.py
