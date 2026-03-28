@@ -1,0 +1,54 @@
+name: Trigger P10 DVC Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'data/raw.dvc'        # fires when new doc added to data/raw
+      - 'data/golden_qa/**'   # fires when QA dataset updated
+      - 'dvc.yaml'            # fires when pipeline stages changed
+      - 'scripts/dvc/**'      # fires when indexer scripts changed
+
+jobs:
+  trigger-p10:
+    name: Submit P10 to Kubeflow
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Setup kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name llm-platform-prod \
+            --region us-east-1
+
+      - name: Install dependencies
+        run: pip install requests kfp==2.2.0 --quiet
+
+      - name: Port-forward KFP API (background)
+        run: |
+          kubectl port-forward svc/ml-pipeline 8080:8888 -n kubeflow &
+          sleep 8
+          echo "KFP port-forward ready"
+
+      - name: Submit P10 pipeline
+        run: |
+          python scripts/submit_p10.py
+        env:
+          KFP_ENDPOINT: http://localhost:8080
+
+      - name: Verify submission
+        run: |
+          sleep 5
+          kubectl get workflow -n kubeflow | grep p10 | tail -3
