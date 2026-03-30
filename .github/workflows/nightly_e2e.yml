@@ -1,0 +1,106 @@
+﻿name: Nightly E2E Tests
+
+on:
+  schedule:
+    - cron: "0 4 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      run_mode:
+        description: "Test mode: pytest, kfp, or both"
+        default: "kfp"
+        type: choice
+        options: ["kfp", "pytest", "both"]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  e2e-pytest:
+    name: E2E pytest (L1-L5)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ github.event.inputs.run_mode != 'kfp' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - run: pip install pytest qdrant-client sentence-transformers requests mlflow psycopg2-binary protobuf==4.25.3 --quiet
+      - run: aws eks update-kubeconfig --region us-east-1 --name llm-platform-prod
+      - name: Start port-forwards
+        run: |
+          kubectl port-forward svc/qdrant 6333:6333 -n llm-platform-prod &
+          kubectl port-forward svc/vllm-service 8000:8000 -n llm-platform-prod &
+          kubectl port-forward svc/mlflow-service 5000:5000 -n mlflow &
+          sleep 15
+      - name: Run pytest E2E
+        env:
+          QDRANT_HOST: localhost
+          VLLM_BASE_URL: http://localhost:8000
+          MLFLOW_URI: http://localhost:5000
+          POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
+          POSTGRES_PASS: ${{ secrets.POSTGRES_PASS }}
+        run: |
+          pytest tests/e2e/test_full_flow.py -v --tb=short \
+            -k "not ragas_faithfulness_spot_check" \
+            --junit-xml=e2e_results.xml 2>&1 | tee e2e_output.txt
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-pytest-results
+          path: e2e_results.xml
+      - name: Summary
+        if: always()
+        run: |
+          echo "### E2E pytest" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          tail -15 e2e_output.txt >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  e2e-kfp:
+    name: P12 KFP E2E pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: ${{ github.event.inputs.run_mode != 'pytest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - run: pip install kfp==2.2.0 requests --quiet
+      - run: aws eks update-kubeconfig --region us-east-1 --name llm-platform-prod
+      - name: Start KFP port-forward
+        run: |
+          kubectl port-forward svc/ml-pipeline 8080:8888 -n kubeflow &
+          sleep 10
+      - run: python scripts/compile_p12.py
+      - name: Submit P12
+        env:
+          KFP_ENDPOINT: http://localhost:8080
+        run: python scripts/submit_p12.py
+      - name: Wait for completion (45 min)
+        run: |
+          for i in $(seq 1 45); do
+            STATUS=$(kubectl get workflow -n kubeflow \
+              --sort-by=.metadata.creationTimestamp \
+              -o jsonpath='{.items[-1:].status.phase}' 2>/dev/null || echo "Unknown")
+            echo "[${i}m] P12 E2E: $STATUS"
+            [ "$STATUS" == "Succeeded" ] && break
+            [ "$STATUS" == "Failed" ] && exit 1
+            sleep 60
+          done
+      - name: Summary
+        if: always()
+        run: |
+          echo "### P12 E2E Pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "- MLflow: p12-e2e-tests experiment" >> $GITHUB_STEP_SUMMARY
